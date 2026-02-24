@@ -34,10 +34,10 @@ body {
 }
 
 .top-nav {
-  align-items: center;
+  align-items: stretch;
   border-bottom: 1px solid transparent;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  gap: 0.75rem;
   padding: 1rem 4vw;
   position: sticky;
   top: 0;
@@ -60,23 +60,67 @@ body {
   text-transform: uppercase;
 }
 
-.top-nav nav {
+.top-nav-main {
+  align-items: center;
   display: flex;
-  gap: 1.2rem;
+  gap: 1rem;
+  justify-content: space-between;
 }
 
-.top-nav nav a {
+.nav-ribbon {
+  align-items: center;
+  background: linear-gradient(120deg, rgba(7, 11, 16, 0.88) 0%, rgba(14, 21, 30, 0.82) 100%);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  justify-content: center;
+  padding: 0.4rem;
+}
+
+.nav-ribbon a {
   color: var(--muted);
   font-size: 0.82rem;
   letter-spacing: 0.1em;
+  padding: 0.5rem 0.8rem;
+  border-radius: 999px;
   text-decoration: none;
   text-transform: uppercase;
-  transition: color 0.4s var(--ease);
+  transition: color 0.4s var(--ease), background 0.4s var(--ease);
 }
 
-.top-nav nav a.active,
-.top-nav nav a:hover {
+.nav-ribbon a.active,
+.nav-ribbon a:hover {
+  background: rgba(194, 154, 82, 0.16);
   color: var(--text);
+}
+
+.ai-ask-inline {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ai-ask-inline input {
+  background: rgba(10, 14, 19, 0.85);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  min-width: 220px;
+  padding: 0.55rem 0.7rem;
+}
+
+.ai-ask-inline button {
+  background: linear-gradient(120deg, #af833f, var(--gold-strong));
+  border: 1px solid transparent;
+  color: #12161a;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.55rem 0.8rem;
+  text-transform: uppercase;
 }
 
 .section,
@@ -478,6 +522,18 @@ body {
   max-width: 760px;
 }
 
+.post-ad-panel {
+  margin-top: 1rem;
+  max-width: none;
+  width: 100%;
+}
+
+.form-row {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .journal-grid,
 .dashboard-grid {
   display: grid;
@@ -519,13 +575,28 @@ body {
 }
 
 @media (max-width: 1080px) {
-  .top-nav nav {
+  .nav-ribbon {
     display: none;
+  }
+
+  .top-nav-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-ask-inline {
+    width: 100%;
+  }
+
+  .ai-ask-inline input {
+    flex: 1;
+    min-width: 0;
   }
 
   .command-filters,
   .location-filters,
   .filters,
+  .form-row,
   .listing-grid,
   .category-hubs,
   .service-grid,

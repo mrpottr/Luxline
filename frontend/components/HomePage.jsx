@@ -100,6 +100,7 @@ export default function HomePage() {
   const [currencies, setCurrencies] = useState(['USD']);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
   const [search, setSearch] = useState('');
+  const [aiQuery, setAiQuery] = useState('');
   const [category, setCategory] = useState('');
   const [continent, setContinent] = useState('');
   const [country, setCountry] = useState('');
@@ -114,6 +115,21 @@ export default function HomePage() {
   const [authMessage, setAuthMessage] = useState('');
   const [dashboardData, setDashboardData] = useState({ me: null, searches: [], messages: [], alerts: [] });
   const [dashboardError, setDashboardError] = useState('');
+
+  const [listingForm, setListingForm] = useState({
+    title: '',
+    description: '',
+    category: 'real_estate',
+    status: 'draft',
+    currency: 'USD',
+    price: '',
+    location_country: '',
+    location_city: '',
+    make: '',
+    model: '',
+    media_url: ''
+  });
+  const [listingCreateStatus, setListingCreateStatus] = useState('');
 
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -336,6 +352,14 @@ export default function HomePage() {
     navigate(path);
   }
 
+  function submitAiAsk(event) {
+    event.preventDefault();
+    const q = aiQuery.trim();
+    if (!q) return;
+    setSearch(q);
+    navigate('/listings');
+  }
+
   const filteredListings = useMemo(() => {
     return listings.filter((row) => {
       const text = [row.title, row.make, row.model, row.location_city, row.location_country, row.category]
@@ -471,6 +495,50 @@ export default function HomePage() {
     navigate('/');
   }
 
+  async function createListing(event) {
+    event.preventDefault();
+    setListingCreateStatus('Publishing advertisement...');
+    try {
+      const payload = {
+        title: listingForm.title,
+        description: listingForm.description || null,
+        category: listingForm.category,
+        status: listingForm.status,
+        currency: listingForm.currency || 'USD',
+        price: Number(listingForm.price || 0),
+        location_country: listingForm.location_country || null,
+        location_city: listingForm.location_city || null,
+        make: listingForm.make || null,
+        model: listingForm.model || null,
+        media_items: listingForm.media_url
+          ? [{ media_type: 'image', url: listingForm.media_url, sort_order: 0 }]
+          : []
+      };
+
+      await callApi(`${API_BASE}/listings`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }, token);
+
+      setListingCreateStatus('Advertisement created as draft and sent for moderation.');
+      setListingForm({
+        title: '',
+        description: '',
+        category: 'real_estate',
+        status: 'draft',
+        currency: 'USD',
+        price: '',
+        location_country: '',
+        location_city: '',
+        make: '',
+        model: '',
+        media_url: ''
+      });
+    } catch (err) {
+      setListingCreateStatus(err.message);
+    }
+  }
+
   function renderHero() {
     return (
       <section className="lux-hero reveal">
@@ -577,13 +645,6 @@ export default function HomePage() {
                   <option key={item} value={item}>{item}</option>
                 ))}
               </select>
-            </div>
-            <div className="quick-tags">
-              {CATEGORY_OPTIONS.filter((item) => item.value).map((item) => (
-                <button key={item.value} className="tag-btn" onClick={() => setCategory(item.value)}>
-                  {item.label}
-                </button>
-              ))}
             </div>
           </div>
         </section>
@@ -863,6 +924,8 @@ export default function HomePage() {
       );
     }
 
+    const canPostListings = ['private_seller', 'business_account'].includes(dashboardData.me?.role || '');
+
     return (
       <section className="section reveal">
         <div className="section-head">
@@ -890,6 +953,87 @@ export default function HomePage() {
             <p>{dashboardData.alerts.length} alert channels configured</p>
           </article>
         </div>
+        {canPostListings ? (
+          <form className="panel form post-ad-panel" onSubmit={createListing}>
+            <h3>Post Advertisement</h3>
+            <input
+              required
+              placeholder="Title"
+              value={listingForm.title}
+              onChange={(e) => setListingForm((prev) => ({ ...prev, title: e.target.value }))}
+            />
+            <textarea
+              rows={4}
+              placeholder="Description"
+              value={listingForm.description}
+              onChange={(e) => setListingForm((prev) => ({ ...prev, description: e.target.value }))}
+            />
+            <div className="form-row">
+              <select value={listingForm.category} onChange={(e) => setListingForm((prev) => ({ ...prev, category: e.target.value }))}>
+                <option value="real_estate">Real Estate</option>
+                <option value="hypercar">Hypercars</option>
+                <option value="yacht">Yachts</option>
+                <option value="jet">Jets</option>
+                <option value="watch">Watches</option>
+              </select>
+              <select value={listingForm.status} onChange={(e) => setListingForm((prev) => ({ ...prev, status: e.target.value }))}>
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+              </select>
+            </div>
+            <div className="form-row">
+              <input
+                required
+                type="number"
+                min="1"
+                placeholder="Price"
+                value={listingForm.price}
+                onChange={(e) => setListingForm((prev) => ({ ...prev, price: e.target.value }))}
+              />
+              <input
+                placeholder="Currency (USD)"
+                value={listingForm.currency}
+                onChange={(e) => setListingForm((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))}
+              />
+            </div>
+            <div className="form-row">
+              <input
+                placeholder="Country"
+                value={listingForm.location_country}
+                onChange={(e) => setListingForm((prev) => ({ ...prev, location_country: e.target.value }))}
+              />
+              <input
+                placeholder="City"
+                value={listingForm.location_city}
+                onChange={(e) => setListingForm((prev) => ({ ...prev, location_city: e.target.value }))}
+              />
+            </div>
+            <div className="form-row">
+              <input
+                placeholder="Make"
+                value={listingForm.make}
+                onChange={(e) => setListingForm((prev) => ({ ...prev, make: e.target.value }))}
+              />
+              <input
+                placeholder="Model"
+                value={listingForm.model}
+                onChange={(e) => setListingForm((prev) => ({ ...prev, model: e.target.value }))}
+              />
+            </div>
+            <input
+              placeholder="Primary image URL"
+              value={listingForm.media_url}
+              onChange={(e) => setListingForm((prev) => ({ ...prev, media_url: e.target.value }))}
+            />
+            <button className="btn-solid" type="submit">Post Ad</button>
+            {listingCreateStatus ? <p className="status">{listingCreateStatus}</p> : null}
+          </form>
+        ) : (
+          <article className="panel post-ad-panel">
+            <h3>Post Advertisement</h3>
+            <p>Buyer accounts cannot post ads. Create a separate Private Seller or Business Account to publish ads.</p>
+          </article>
+        )}
         {dashboardError ? <p className="status error">{dashboardError}</p> : null}
       </section>
     );
@@ -917,8 +1061,20 @@ export default function HomePage() {
   return (
     <div className="lux-shell">
       <header className={`top-nav ${isScrolled ? 'scrolled' : ''}`}>
-        <a href="/" className="brand" onClick={(e) => onNavClick(e, '/')}>Luxline</a>
-        <nav>
+        <div className="top-nav-main">
+          <a href="/" className="brand" onClick={(e) => onNavClick(e, '/')}>Luxline</a>
+          <form className="ai-ask-inline" onSubmit={submitAiAsk}>
+            <input
+              id="ai-ask-input"
+              type="text"
+              value={aiQuery}
+              onChange={(e) => setAiQuery(e.target.value)}
+              placeholder="Ask from AI..."
+            />
+            <button type="submit">Ask</button>
+          </form>
+        </div>
+        <nav className="nav-ribbon">
           {NAV_LINKS.map((link) => (
             <a key={link.path} href={link.path} onClick={(e) => onNavClick(e, link.path)} className={route.page === (link.path === '/' ? 'home' : link.path.slice(1)) ? 'active' : ''}>
               {link.label}
