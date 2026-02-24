@@ -84,7 +84,9 @@ async function callApi(url, options = {}, token = '') {
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {
-    throw new Error(data?.detail || 'Request failed');
+    const error = new Error(data?.detail || 'Request failed');
+    error.status = res.status;
+    throw error;
   }
   return data;
 }
@@ -327,6 +329,7 @@ export default function HomePage() {
     if (route.page !== 'dashboard' || !token) {
       return;
     }
+    let cancelled = false;
     async function loadDashboard() {
       try {
         const [me, searches, messages, alerts] = await Promise.all([
@@ -335,13 +338,25 @@ export default function HomePage() {
           callApi(`${API_BASE}/users/me/messages`, {}, token),
           callApi(`${API_BASE}/users/me/alerts`, {}, token)
         ]);
+        if (cancelled) return;
         setDashboardData({ me, searches, messages, alerts });
         setDashboardError('');
       } catch (err) {
-        setDashboardError(err.message);
+        if (cancelled) return;
+        if (err?.status === 401) {
+          localStorage.removeItem('luxline_token');
+          setToken('');
+          setDashboardData({ me: null, searches: [], messages: [], alerts: [] });
+          setDashboardError('Session expired. Please sign in again.');
+          return;
+        }
+        setDashboardError(err?.message || 'Unable to load dashboard right now.');
       }
     }
     loadDashboard();
+    return () => {
+      cancelled = true;
+    };
   }, [route.page, token]);
 
   function navigate(path) {
@@ -1029,7 +1044,13 @@ export default function HomePage() {
         <div className="dashboard-grid">
           <article className="panel">
             <h3>Profile</h3>
-            <p>{dashboardData.me ? `${dashboardData.me.first_name} ${dashboardData.me.last_name}` : 'Loading profile...'}</p>
+            <p>
+              {dashboardData.me
+                ? `${dashboardData.me.first_name} ${dashboardData.me.last_name}`
+                : dashboardError
+                  ? 'Profile unavailable'
+                  : 'Loading profile...'}
+            </p>
             <p>{dashboardData.me?.email || ''}</p>
             <p>Role: {dashboardData.me?.role || '-'}</p>
             <button className="btn-outline compact" onClick={logout}>Logout</button>

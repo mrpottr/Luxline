@@ -413,9 +413,17 @@ body {
 .panel input {
   background: rgba(10, 14, 19, 0.8);
   border: 1px solid var(--line);
+  box-sizing: border-box;
   color: var(--text);
   font: inherit;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.9rem;
+  width: 100%;
+}
+
+.form textarea {
+  resize: none;
 }
 
 .filters input:focus,
