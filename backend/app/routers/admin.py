@@ -5,7 +5,7 @@ from backend.app.core.security import hash_password
 from backend.app.db.session import get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import AuditLog, Listing, ModerationStatus, User, UserRole
-from backend.app.schemas import AdminResetPasswordRequest, ListingOut, UserOut
+from backend.app.schemas import AdminResetPasswordRequest, ListingOut, UserOut, UserRoleUpdate
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -84,6 +84,33 @@ def admin_reset_password(
         raise HTTPException(status_code=404, detail="User not found")
     user.password_hash = hash_password(payload.new_password)
     db.add(AuditLog(actor_user_id=admin.id, event_type="user.password_reset", details={"user_id": user_id}))
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.patch("/users/{user_id}/role", response_model=UserOut)
+def admin_update_user_role(
+    user_id: int,
+    payload: UserRoleUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.super_admin)),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if payload.role == UserRole.super_admin:
+        raise HTTPException(status_code=400, detail="Cannot assign super admin role from this endpoint")
+
+    user.role = payload.role
+    user.is_2fa_enabled = payload.role == UserRole.business_account
+    db.add(
+        AuditLog(
+            actor_user_id=admin.id,
+            event_type="user.role_changed",
+            details={"user_id": user_id, "new_role": payload.role.value},
+        )
+    )
     db.commit()
     db.refresh(user)
     return user

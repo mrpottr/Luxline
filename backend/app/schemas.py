@@ -72,6 +72,10 @@ class UserPreferencesUpdate(BaseModel):
     measurement_system: str | None = None
 
 
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
 class AgencyProfileUpsert(BaseModel):
     name: str
     logo_url: str | None = None
