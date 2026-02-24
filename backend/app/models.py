@@ -1,3 +1,5 @@
+"""SQLAlchemy ORM models and enums for the Luxline domain."""
+
 from datetime import datetime
 from enum import Enum
 

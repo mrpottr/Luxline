@@ -1,3 +1,5 @@
+"""Lead-routing and seller-contact endpoints."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,7 @@ def contact_seller(
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
+    """Create an inquiry for a listing and record lead-routing audit metadata."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -50,6 +53,7 @@ def reveal_phone_number(
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
+    """Return seller phone details for a listing and track the reveal event."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -60,4 +64,5 @@ def reveal_phone_number(
 
 @router.get("/me/inbox", response_model=list[InquiryOut])
 def my_inbox(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """List inbound inquiries received by the authenticated seller."""
     return db.query(Inquiry).filter(Inquiry.seller_id == current_user.id).order_by(Inquiry.created_at.desc()).all()

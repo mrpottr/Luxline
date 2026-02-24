@@ -1,3 +1,5 @@
+"""Search endpoints for listings discovery and filter metadata."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
@@ -26,6 +28,7 @@ def global_search(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
+    """Run filtered listing search over publicly visible inventory."""
     conditions = [Listing.status == ListingStatus.active, Listing.moderation_status == ModerationStatus.approved]
 
     if q:
@@ -82,6 +85,7 @@ def global_search(
 
 @router.get("/autocomplete")
 def autocomplete(db: Session = Depends(get_db), q: str = Query(min_length=2, max_length=60)):
+    """Return lightweight typeahead suggestions from make/model/city fields."""
     wildcard = f"%{q}%"
     rows = (
         db.query(Listing.make, Listing.model, Listing.location_city)
@@ -111,6 +115,7 @@ def facets(
     db: Session = Depends(get_db),
     category: str | None = Query(default=None),
 ):
+    """Return aggregated facet counts used by client-side search filters."""
     conditions = [Listing.status == ListingStatus.active, Listing.moderation_status == ModerationStatus.approved]
     if category:
         try:

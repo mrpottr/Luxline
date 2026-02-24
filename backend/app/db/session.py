@@ -1,3 +1,5 @@
+"""Database engine/session configuration and request-scoped session provider."""
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -11,9 +13,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def get_db():
+    """Yield a SQLAlchemy session for request handlers and close it afterward."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-

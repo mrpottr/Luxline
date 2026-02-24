@@ -1,3 +1,5 @@
+"""User profile, preferences, and account-data endpoints."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -21,6 +23,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):
+    """Return the authenticated user's profile."""
     return current_user
 
 
@@ -30,6 +33,7 @@ def update_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Update user-level preference fields such as currency and language."""
     if payload.preferred_currency:
         current_user.preferred_currency = payload.preferred_currency.upper()
     if payload.preferred_language:
@@ -43,6 +47,7 @@ def update_preferences(
 
 @router.get("/me/saved-listings")
 def get_saved_listings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Return listing IDs the user has saved for later review."""
     rows = db.query(SavedListing).filter(SavedListing.user_id == current_user.id).all()
     return {"items": [{"id": row.id, "listing_id": row.listing_id, "saved_at": row.created_at} for row in rows]}
 
@@ -53,6 +58,7 @@ def create_saved_search(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Create a saved-search definition for the authenticated user."""
     saved = SavedSearch(
         user_id=current_user.id,
         name=payload.name,
@@ -67,11 +73,13 @@ def create_saved_search(
 
 @router.get("/me/saved-searches", response_model=list[SavedSearchOut])
 def list_saved_searches(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """List saved-search configurations for the authenticated user."""
     return db.query(SavedSearch).filter(SavedSearch.user_id == current_user.id).all()
 
 
 @router.get("/me/alerts", response_model=list[AlertPreferenceOut])
 def get_alert_preferences(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """List notification channel preferences for the authenticated user."""
     return db.query(AlertPreference).filter(AlertPreference.user_id == current_user.id).all()
 
 
@@ -81,6 +89,7 @@ def set_alert_preference(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Create or update a single alert preference channel state."""
     channel = payload.channel.strip().lower()
     if channel not in {"email", "push", "sms"}:
         raise HTTPException(status_code=400, detail="Unsupported alert channel")
@@ -102,6 +111,7 @@ def set_alert_preference(
 
 @router.get("/me/messages", response_model=list[InquiryOut])
 def get_message_history(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Return inquiry history where the user is buyer or seller."""
     return (
         db.query(Inquiry)
         .filter(or_(Inquiry.buyer_id == current_user.id, Inquiry.seller_id == current_user.id))
@@ -116,6 +126,7 @@ def list_users_for_admin(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """List platform users for super-admin management workflows."""
     return db.query(User).order_by(User.created_at.desc()).all()
 
 
@@ -125,6 +136,7 @@ def suspend_user(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Suspend a user account as an administrative action."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

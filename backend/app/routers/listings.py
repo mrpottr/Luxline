@@ -1,3 +1,5 @@
+"""Listing management, retrieval, and import endpoints."""
+
 from datetime import datetime
 import csv
 import io
@@ -34,6 +36,7 @@ router = APIRouter(prefix="/listings", tags=["listings"])
 
 
 def ensure_unique_slug(db: Session, base_slug: str) -> str:
+    """Generate a unique listing slug by appending an incrementing suffix."""
     slug = base_slug
     counter = 2
     while db.query(Listing).filter(Listing.slug == slug).first():
@@ -50,6 +53,7 @@ def create_listing(
         require_roles(UserRole.private_seller, UserRole.business_account, UserRole.super_admin)
     ),
 ):
+    """Create a new listing for eligible seller roles and attach media items."""
     agency_id = None
     if current_user.role == UserRole.business_account:
         agency = db.query(AgencyProfile).filter(AgencyProfile.owner_id == current_user.id).first()
@@ -115,6 +119,7 @@ def list_listings(
     min_price: float | None = Query(default=None),
     max_price: float | None = Query(default=None),
 ):
+    """List public approved listings with optional filter parameters."""
     conditions = []
     if category:
         try:
@@ -146,6 +151,7 @@ def get_listing(
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
+    """Return a listing by ID, including owner/admin preview of unpublished listings."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -164,6 +170,7 @@ def update_listing(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Update a listing for its owner or an admin user."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -186,6 +193,7 @@ def save_listing(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Save a listing to the authenticated user's saved-listings collection."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -208,6 +216,7 @@ def bulk_import_listings(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
+    """Bulk-create draft listings from normalized import payload items."""
     created_ids: list[int] = []
     for item in payload.items:
         base_slug = slugify(f"{item.category.value}-{item.make or ''}-{item.model or ''}-{item.title}")
@@ -241,6 +250,7 @@ def import_feed(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
+    """Parse CSV/XML feed content and import valid rows as draft listings."""
     source = payload.source.strip().lower()
     if source not in {"csv", "xml"}:
         raise HTTPException(status_code=400, detail="Unsupported import source")

@@ -1,3 +1,5 @@
+"""Authentication and account-access endpoints."""
+
 from datetime import datetime, timedelta
 import hashlib
 
@@ -31,6 +33,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
+    """Register a new user account with role-based defaults."""
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -55,6 +58,7 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate a user and return either a token or a 2FA challenge."""
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -85,6 +89,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/2fa/verify", response_model=TokenResponse)
 def verify_two_factor(payload: TwoFactorVerifyRequest, db: Session = Depends(get_db)):
+    """Validate a 2FA challenge code and issue an access token."""
     challenge = db.query(TwoFactorChallenge).filter(TwoFactorChallenge.id == payload.challenge_id).first()
     if not challenge:
         raise HTTPException(status_code=404, detail="2FA challenge not found")
@@ -108,6 +113,7 @@ def verify_two_factor(payload: TwoFactorVerifyRequest, db: Session = Depends(get
 
 @router.post("/social/login", response_model=TokenResponse)
 def social_login(payload: SocialLoginRequest, db: Session = Depends(get_db)):
+    """Log in or provision a user from a supported social identity provider."""
     provider = payload.provider.lower().strip()
     if provider not in {"google", "apple"}:
         raise HTTPException(status_code=400, detail="Unsupported social provider")

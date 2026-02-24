@@ -1,3 +1,5 @@
+"""Environment-backed application settings."""
+
 import os
 from dataclasses import dataclass
 
@@ -11,6 +13,7 @@ load_dotenv(ENV_PATH)
 
 @dataclass(frozen=True)
 class Settings:
+    """Runtime configuration loaded from `.env` with safe defaults."""
     app_name: str = os.getenv("APP_NAME", "Luxline API")
     app_env: str = os.getenv("APP_ENV", "development")
     app_version: str = os.getenv("APP_VERSION", "1.0.0")

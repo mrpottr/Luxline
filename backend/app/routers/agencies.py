@@ -1,3 +1,5 @@
+"""Agency profile and team management endpoints."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,12 @@ def create_or_update_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.business_account)),
 ):
+    """Create or update the authenticated business user's agency profile.
+
+    This endpoint behaves as an upsert:
+    - Creates a new profile if one does not exist for the current owner.
+    - Updates the existing profile fields when a profile is already present.
+    """
     profile = db.query(AgencyProfile).filter(AgencyProfile.owner_id == current_user.id).first()
     if not profile:
         profile = AgencyProfile(owner_id=current_user.id, **payload.model_dump())
@@ -38,6 +46,11 @@ def get_my_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.business_account)),
 ):
+    """Return the authenticated business user's own agency profile.
+
+    Raises:
+        HTTPException: 404 if the user has not created an agency profile yet.
+    """
     profile = db.query(AgencyProfile).filter(AgencyProfile.owner_id == current_user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Agency profile not found")
@@ -50,6 +63,13 @@ def add_team_member(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.business_account)),
 ):
+    """Add a new team member to the authenticated business user's agency profile.
+
+    A profile must exist before team members can be attached to it.
+
+    Raises:
+        HTTPException: 404 if the agency profile for the current user is missing.
+    """
     profile = db.query(AgencyProfile).filter(AgencyProfile.owner_id == current_user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Agency profile not found")
@@ -70,8 +90,14 @@ def add_team_member(
 
 @router.get("/{agency_id}", response_model=AgencyProfileOut)
 def get_public_agency_profile(agency_id: int, db: Session = Depends(get_db)):
+    """Return a public agency profile by agency identifier.
+
+    This endpoint supports public profile lookups from listing and agency views.
+
+    Raises:
+        HTTPException: 404 if the requested agency profile does not exist.
+    """
     profile = db.query(AgencyProfile).filter(AgencyProfile.id == agency_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Agency profile not found")
     return profile
-

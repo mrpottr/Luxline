@@ -1,3 +1,5 @@
+"""Monetization endpoints for subscriptions, featured placements, and blog content."""
+
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +20,7 @@ def create_subscription(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
+    """Create an active subscription record for an eligible business user."""
     subscription = Subscription(
         business_user_id=current_user.id,
         plan_code=payload.plan_code,
@@ -33,6 +36,7 @@ def create_subscription(
 
 @router.get("/subscriptions/me", response_model=list[SubscriptionOut])
 def my_subscriptions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """List subscriptions owned by the authenticated user."""
     return (
         db.query(Subscription)
         .filter(Subscription.business_user_id == current_user.id)
@@ -47,6 +51,7 @@ def feature_listing(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
+    """Mark a listing as featured and create placement metadata if needed."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -68,6 +73,7 @@ def create_blog_post(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Create a blog post as a super-admin operation."""
     post = BlogPost(**payload.model_dump())
     db.add(post)
     db.commit()
@@ -77,8 +83,8 @@ def create_blog_post(
 
 @router.get("/blog/posts", response_model=list[BlogPostOut])
 def list_blog_posts(db: Session = Depends(get_db), include_unpublished: bool = False):
+    """List blog posts, optionally including unpublished drafts."""
     query = db.query(BlogPost).order_by(BlogPost.created_at.desc())
     if not include_unpublished:
         query = query.filter(BlogPost.published.is_(True))
     return query.limit(50).all()
-

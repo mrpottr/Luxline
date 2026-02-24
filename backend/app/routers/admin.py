@@ -1,3 +1,5 @@
+"""Administrative endpoints for moderation and account operations."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,7 @@ def moderation_queue(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Return pending listings requiring moderation review."""
     return (
         db.query(Listing)
         .filter(Listing.moderation_status == ModerationStatus.pending)
@@ -30,6 +33,7 @@ def approve_listing(
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Approve a listing in moderation and record an audit event."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -46,6 +50,7 @@ def reject_listing(
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Reject a listing in moderation and record an audit event."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -62,6 +67,7 @@ def verify_business_user(
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Mark a user as business-verified and record the admin action."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -79,6 +85,7 @@ def admin_reset_password(
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Reset a user password as an admin operation and audit the change."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -96,6 +103,7 @@ def admin_update_user_role(
     db: Session = Depends(get_db),
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
+    """Change a user's role (excluding super-admin assignment) and audit it."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

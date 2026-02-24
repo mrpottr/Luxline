@@ -1,3 +1,5 @@
+"""Application factory and router wiring for the Luxline API."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +10,10 @@ from backend.app.routers import admin, agencies, auth, health, leads, listings, 
 
 
 def create_app() -> FastAPI:
+    """Build and configure the FastAPI application instance.
+
+    The app configures CORS, ensures tables exist, and registers all versioned routers.
+    """
     app = FastAPI(title=settings.app_name, version=settings.app_version)
 
     origins = [origin.strip() for origin in settings.cors_origins.split(",")] if settings.cors_origins else ["*"]
@@ -38,4 +44,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

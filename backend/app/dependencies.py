@@ -1,3 +1,5 @@
+"""Reusable FastAPI dependency providers for auth and authorization."""
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
@@ -13,6 +15,7 @@ optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", aut
 
 
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)) -> User:
+    """Return the authenticated active user or raise a 401 error."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid authentication credentials",
@@ -31,6 +34,7 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
 
 
 def get_optional_current_user(db: Session = Depends(get_db), token: str | None = Depends(optional_oauth2_scheme)) -> User | None:
+    """Return the authenticated user if possible; otherwise return `None`."""
     if not token:
         return None
     try:
@@ -44,7 +48,9 @@ def get_optional_current_user(db: Session = Depends(get_db), token: str | None =
 
 
 def require_roles(*roles: UserRole):
+    """Build a dependency that allows only users with one of the provided roles."""
     def _role_dependency(current_user: User = Depends(get_current_user)) -> User:
+        """Validate that the current user matches the accepted role set."""
         if current_user.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         return current_user
