@@ -113,6 +113,10 @@ export default function HomePage() {
   const [agencyError, setAgencyError] = useState('');
   const [authMode, setAuthMode] = useState('login');
   const [authMessage, setAuthMessage] = useState('');
+  const [twoFactorChallengeId, setTwoFactorChallengeId] = useState(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorExpiresIn, setTwoFactorExpiresIn] = useState(null);
+  const [twoFactorDevCode, setTwoFactorDevCode] = useState('');
   const [dashboardData, setDashboardData] = useState({ me: null, searches: [], messages: [], alerts: [] });
   const [dashboardError, setDashboardError] = useState('');
 
@@ -467,13 +471,38 @@ export default function HomePage() {
         return;
       }
 
+      if (twoFactorChallengeId) {
+        const verifyData = await callApi(`${API_BASE}/auth/2fa/verify`, {
+          method: 'POST',
+          body: JSON.stringify({
+            challenge_id: twoFactorChallengeId,
+            code: twoFactorCode
+          })
+        });
+        if (verifyData.access_token) {
+          localStorage.setItem('luxline_token', verifyData.access_token);
+          setToken(verifyData.access_token);
+          setTwoFactorChallengeId(null);
+          setTwoFactorCode('');
+          setTwoFactorExpiresIn(null);
+          setTwoFactorDevCode('');
+          setAuthMessage('Logged in successfully.');
+          navigate('/dashboard');
+        }
+        return;
+      }
+
       const data = await callApi(`${API_BASE}/auth/login`, {
         method: 'POST',
         body: JSON.stringify({ email: authForm.email, password: authForm.password })
       });
 
       if (data.requires_2fa) {
-        setAuthMessage('2FA is required for this account. Verify with /auth/2fa/verify from your client flow.');
+        setTwoFactorChallengeId(data.challenge_id || null);
+        setTwoFactorCode('');
+        setTwoFactorExpiresIn(data.otp_expires_in_seconds || null);
+        setTwoFactorDevCode(data.otp_code_dev_only || '');
+        setAuthMessage('2FA is required. Enter the 6-digit code to continue.');
         return;
       }
 
@@ -491,6 +520,10 @@ export default function HomePage() {
   function logout() {
     localStorage.removeItem('luxline_token');
     setToken('');
+    setTwoFactorChallengeId(null);
+    setTwoFactorCode('');
+    setTwoFactorExpiresIn(null);
+    setTwoFactorDevCode('');
     setDashboardData({ me: null, searches: [], messages: [], alerts: [] });
     navigate('/');
   }
@@ -886,6 +919,8 @@ export default function HomePage() {
   }
 
   function renderAuthCard() {
+    const isTwoFactorStep = authMode === 'login' && !!twoFactorChallengeId;
+
     return (
       <form className="panel form" onSubmit={submitAuth}>
         {authMode === 'register' ? (
@@ -900,12 +935,71 @@ export default function HomePage() {
             </select>
           </>
         ) : null}
-        <input type="email" placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm((prev) => ({ ...prev, email: e.target.value }))} required />
-        <input type="password" placeholder="Password" value={authForm.password} onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))} required />
-        <button className="btn-solid" type="submit">{authMode === 'login' ? 'Login' : 'Create Account'}</button>
-        <button className="btn-outline compact" type="button" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
+        <input
+          type="email"
+          placeholder="Email"
+          value={authForm.email}
+          onChange={(e) => setAuthForm((prev) => ({ ...prev, email: e.target.value }))}
+          required
+          disabled={isTwoFactorStep}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={authForm.password}
+          onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
+          required
+          disabled={isTwoFactorStep}
+        />
+        {isTwoFactorStep ? (
+          <>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              minLength={6}
+              maxLength={6}
+              placeholder="6-digit verification code"
+              value={twoFactorCode}
+              onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              required
+            />
+            {twoFactorExpiresIn ? <p className="status">Code expires in about {Math.floor(twoFactorExpiresIn / 60)} minutes.</p> : null}
+            {twoFactorDevCode ? <p className="status">Dev code: {twoFactorDevCode}</p> : null}
+          </>
+        ) : null}
+        <button className="btn-solid" type="submit">
+          {authMode === 'login' ? (isTwoFactorStep ? 'Verify 2FA' : 'Login') : 'Create Account'}
+        </button>
+        <button
+          className="btn-outline compact"
+          type="button"
+          onClick={() => {
+            setAuthMode(authMode === 'login' ? 'register' : 'login');
+            setTwoFactorChallengeId(null);
+            setTwoFactorCode('');
+            setTwoFactorExpiresIn(null);
+            setTwoFactorDevCode('');
+            setAuthMessage('');
+          }}
+        >
           {authMode === 'login' ? 'Need an account?' : 'Have an account?'}
         </button>
+        {isTwoFactorStep ? (
+          <button
+            className="btn-outline compact"
+            type="button"
+            onClick={() => {
+              setTwoFactorChallengeId(null);
+              setTwoFactorCode('');
+              setTwoFactorExpiresIn(null);
+              setTwoFactorDevCode('');
+              setAuthMessage('2FA verification canceled. Login again to request a new code.');
+            }}
+          >
+            Cancel 2FA
+          </button>
+        ) : null}
         {authMessage ? <p className="status">{authMessage}</p> : null}
       </form>
     );
