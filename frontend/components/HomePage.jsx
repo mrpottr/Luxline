@@ -8,8 +8,7 @@ const NAV_LINKS = [
   { path: '/listings', label: 'Listings' },
   { path: '/agencies', label: 'Agencies' },
   { path: '/journal', label: 'Journal' },
-  { path: '/concierge', label: 'Concierge' },
-  { path: '/dashboard', label: 'Dashboard' }
+  { path: '/concierge', label: 'Concierge' }
 ];
 
 const CATEGORY_OPTIONS = [
@@ -50,6 +49,16 @@ function money(value, code = 'USD') {
 
 function categoryLabel(value) {
   return String(value || '').replaceAll('_', ' ');
+}
+
+function roleLabel(value) {
+  const map = {
+    standard_user: 'Buyer',
+    private_seller: 'Private Seller',
+    business_account: 'Business Account',
+    super_admin: 'Administrator'
+  };
+  return map[value] || String(value || '').replaceAll('_', ' ');
 }
 
 function normalizeText(value) {
@@ -115,6 +124,11 @@ export default function HomePage() {
   const [agencyError, setAgencyError] = useState('');
   const [authMode, setAuthMode] = useState('login');
   const [authMessage, setAuthMessage] = useState('');
+  const [emailVerificationId, setEmailVerificationId] = useState(null);
+  const [emailVerificationCode, setEmailVerificationCode] = useState('');
+  const [emailVerificationExpiresIn, setEmailVerificationExpiresIn] = useState(null);
+  const [emailVerificationDevCode, setEmailVerificationDevCode] = useState('');
+  const [emailVerificationEmail, setEmailVerificationEmail] = useState('');
   const [twoFactorChallengeId, setTwoFactorChallengeId] = useState(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorExpiresIn, setTwoFactorExpiresIn] = useState(null);
@@ -326,7 +340,7 @@ export default function HomePage() {
   }, [route.page, route.id, token]);
 
   useEffect(() => {
-    if (route.page !== 'dashboard' || !token) {
+    if (!token || (route.page !== 'dashboard' && route.page !== 'account')) {
       return;
     }
     let cancelled = false;
@@ -477,12 +491,20 @@ export default function HomePage() {
     setAuthMessage('Processing...');
     try {
       if (authMode === 'register') {
-        await callApi(`${API_BASE}/auth/register`, {
+        const registerData = await callApi(`${API_BASE}/auth/register`, {
           method: 'POST',
           body: JSON.stringify(authForm)
         });
-        setAuthMessage('Registration complete. Login now.');
-        setAuthMode('login');
+        setEmailVerificationId(registerData.email_verification_id || null);
+        setEmailVerificationExpiresIn(registerData.email_otp_expires_in_seconds || null);
+        setEmailVerificationDevCode(registerData.email_otp_code_dev_only || '');
+        setEmailVerificationEmail(authForm.email);
+        setEmailVerificationCode('');
+        setAuthMessage(
+          registerData.email_sent
+            ? 'Verification code sent. Check your email to continue.'
+            : 'Unable to send email. Use the dev code to verify.'
+        );
         return;
       }
 
@@ -512,6 +534,20 @@ export default function HomePage() {
         body: JSON.stringify({ email: authForm.email, password: authForm.password })
       });
 
+      if (data.requires_email_verification) {
+        setEmailVerificationId(data.email_verification_id || null);
+        setEmailVerificationExpiresIn(data.email_otp_expires_in_seconds || null);
+        setEmailVerificationDevCode(data.email_otp_code_dev_only || '');
+        setEmailVerificationEmail(authForm.email);
+        setEmailVerificationCode('');
+        setAuthMessage(
+          data.email_sent
+            ? 'Email verification required. Check your inbox for the code.'
+            : 'Email verification required. Use the dev code to verify.'
+        );
+        return;
+      }
+
       if (data.requires_2fa) {
         setTwoFactorChallengeId(data.challenge_id || null);
         setTwoFactorCode('');
@@ -532,9 +568,63 @@ export default function HomePage() {
     }
   }
 
+  async function submitEmailVerification(event) {
+    event.preventDefault();
+    if (!emailVerificationId) return;
+    setAuthMessage('Verifying email...');
+    try {
+      const verifyData = await callApi(`${API_BASE}/auth/email/verify`, {
+        method: 'POST',
+        body: JSON.stringify({
+          verification_id: emailVerificationId,
+          code: emailVerificationCode
+        })
+      });
+      if (verifyData.access_token) {
+        localStorage.setItem('luxline_token', verifyData.access_token);
+        setToken(verifyData.access_token);
+        setEmailVerificationId(null);
+        setEmailVerificationCode('');
+        setEmailVerificationExpiresIn(null);
+        setEmailVerificationDevCode('');
+        setEmailVerificationEmail('');
+        setAuthMessage('Email verified. Logged in successfully.');
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setAuthMessage(err.message);
+    }
+  }
+
+  async function resendEmailVerification() {
+    if (!emailVerificationEmail) return;
+    setAuthMessage('Sending a new verification code...');
+    try {
+      const data = await callApi(`${API_BASE}/auth/email/resend`, {
+        method: 'POST',
+        body: JSON.stringify({ email: emailVerificationEmail })
+      });
+      setEmailVerificationId(data.email_verification_id || null);
+      setEmailVerificationExpiresIn(data.email_otp_expires_in_seconds || null);
+      setEmailVerificationDevCode(data.email_otp_code_dev_only || '');
+      setAuthMessage(
+        data.email_sent
+          ? 'New verification code sent.'
+          : 'Unable to send email. Use the dev code to verify.'
+      );
+    } catch (err) {
+      setAuthMessage(err.message);
+    }
+  }
+
   function logout() {
     localStorage.removeItem('luxline_token');
     setToken('');
+    setEmailVerificationId(null);
+    setEmailVerificationCode('');
+    setEmailVerificationExpiresIn(null);
+    setEmailVerificationDevCode('');
+    setEmailVerificationEmail('');
     setTwoFactorChallengeId(null);
     setTwoFactorCode('');
     setTwoFactorExpiresIn(null);
@@ -935,39 +1025,16 @@ export default function HomePage() {
 
   function renderAuthCard() {
     const isTwoFactorStep = authMode === 'login' && !!twoFactorChallengeId;
+    const isEmailVerificationStep = !!emailVerificationId;
 
     return (
-      <form className="panel form" onSubmit={submitAuth}>
-        {authMode === 'register' ? (
+      <form className="panel form" onSubmit={isEmailVerificationStep ? submitEmailVerification : submitAuth}>
+        {isEmailVerificationStep ? (
           <>
-            <input placeholder="First name" value={authForm.first_name} onChange={(e) => setAuthForm((prev) => ({ ...prev, first_name: e.target.value }))} required />
-            <input placeholder="Last name" value={authForm.last_name} onChange={(e) => setAuthForm((prev) => ({ ...prev, last_name: e.target.value }))} required />
-            <input placeholder="Phone" value={authForm.phone} onChange={(e) => setAuthForm((prev) => ({ ...prev, phone: e.target.value }))} />
-            <select value={authForm.role} onChange={(e) => setAuthForm((prev) => ({ ...prev, role: e.target.value }))}>
-              <option value="standard_user">Buyer</option>
-              <option value="private_seller">Private Seller</option>
-              <option value="business_account">Business Account</option>
-            </select>
-          </>
-        ) : null}
-        <input
-          type="email"
-          placeholder="Email"
-          value={authForm.email}
-          onChange={(e) => setAuthForm((prev) => ({ ...prev, email: e.target.value }))}
-          required
-          disabled={isTwoFactorStep}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={authForm.password}
-          onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
-          required
-          disabled={isTwoFactorStep}
-        />
-        {isTwoFactorStep ? (
-          <>
+            <p className="type">Verify Email</p>
+            <p className="status">
+              Enter the 6-digit code sent to {emailVerificationEmail || 'your email'}.
+            </p>
             <input
               type="text"
               inputMode="numeric"
@@ -975,48 +1042,137 @@ export default function HomePage() {
               minLength={6}
               maxLength={6}
               placeholder="6-digit verification code"
-              value={twoFactorCode}
-              onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              value={emailVerificationCode}
+              onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               required
             />
-            {twoFactorExpiresIn ? <p className="status">Code expires in about {Math.floor(twoFactorExpiresIn / 60)} minutes.</p> : null}
-            {twoFactorDevCode ? <p className="status">Dev code: {twoFactorDevCode}</p> : null}
+            {emailVerificationExpiresIn ? (
+              <p className="status">Code expires in about {Math.floor(emailVerificationExpiresIn / 60)} minutes.</p>
+            ) : null}
+            {emailVerificationDevCode ? <p className="status">Dev code: {emailVerificationDevCode}</p> : null}
+            <button className="btn-solid" type="submit">Verify Email</button>
+            <button className="btn-outline compact" type="button" onClick={resendEmailVerification}>
+              Resend Code
+            </button>
+            <button
+              className="btn-outline compact"
+              type="button"
+              onClick={() => {
+                setEmailVerificationId(null);
+                setEmailVerificationCode('');
+                setEmailVerificationExpiresIn(null);
+                setEmailVerificationDevCode('');
+                setEmailVerificationEmail('');
+                setAuthMessage('Email verification canceled. You can login again.');
+              }}
+            >
+              Cancel Verification
+            </button>
           </>
-        ) : null}
-        <button className="btn-solid" type="submit">
-          {authMode === 'login' ? (isTwoFactorStep ? 'Verify 2FA' : 'Login') : 'Create Account'}
-        </button>
-        <button
-          className="btn-outline compact"
-          type="button"
-          onClick={() => {
-            setAuthMode(authMode === 'login' ? 'register' : 'login');
-            setTwoFactorChallengeId(null);
-            setTwoFactorCode('');
-            setTwoFactorExpiresIn(null);
-            setTwoFactorDevCode('');
-            setAuthMessage('');
-          }}
-        >
-          {authMode === 'login' ? 'Need an account?' : 'Have an account?'}
-        </button>
-        {isTwoFactorStep ? (
-          <button
-            className="btn-outline compact"
-            type="button"
-            onClick={() => {
-              setTwoFactorChallengeId(null);
-              setTwoFactorCode('');
-              setTwoFactorExpiresIn(null);
-              setTwoFactorDevCode('');
-              setAuthMessage('2FA verification canceled. Login again to request a new code.');
-            }}
-          >
-            Cancel 2FA
-          </button>
-        ) : null}
+        ) : (
+          <>
+            {authMode === 'register' ? (
+              <>
+                <input placeholder="First name" value={authForm.first_name} onChange={(e) => setAuthForm((prev) => ({ ...prev, first_name: e.target.value }))} required />
+                <input placeholder="Last name" value={authForm.last_name} onChange={(e) => setAuthForm((prev) => ({ ...prev, last_name: e.target.value }))} required />
+                <input placeholder="Phone" value={authForm.phone} onChange={(e) => setAuthForm((prev) => ({ ...prev, phone: e.target.value }))} />
+                <select value={authForm.role} onChange={(e) => setAuthForm((prev) => ({ ...prev, role: e.target.value }))}>
+                  <option value="standard_user">Buyer</option>
+                  <option value="private_seller">Private Seller</option>
+                  <option value="business_account">Business Account</option>
+                </select>
+              </>
+            ) : null}
+            <input
+              type="email"
+              placeholder="Email"
+              value={authForm.email}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, email: e.target.value }))}
+              required
+              disabled={isTwoFactorStep}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={authForm.password}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
+              required
+              disabled={isTwoFactorStep}
+            />
+            {isTwoFactorStep ? (
+              <>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  minLength={6}
+                  maxLength={6}
+                  placeholder="6-digit verification code"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  required
+                />
+                {twoFactorExpiresIn ? <p className="status">Code expires in about {Math.floor(twoFactorExpiresIn / 60)} minutes.</p> : null}
+                {twoFactorDevCode ? <p className="status">Dev code: {twoFactorDevCode}</p> : null}
+              </>
+            ) : null}
+            <button className="btn-solid" type="submit">
+              {authMode === 'login' ? (isTwoFactorStep ? 'Verify 2FA' : 'Login') : 'Create Account'}
+            </button>
+            <button
+              className="btn-outline compact"
+              type="button"
+              onClick={() => {
+                setAuthMode(authMode === 'login' ? 'register' : 'login');
+                setTwoFactorChallengeId(null);
+                setTwoFactorCode('');
+                setTwoFactorExpiresIn(null);
+                setTwoFactorDevCode('');
+                setAuthMessage('');
+              }}
+            >
+              {authMode === 'login' ? 'Need an account?' : 'Have an account?'}
+            </button>
+            {isTwoFactorStep ? (
+              <button
+                className="btn-outline compact"
+                type="button"
+                onClick={() => {
+                  setTwoFactorChallengeId(null);
+                  setTwoFactorCode('');
+                  setTwoFactorExpiresIn(null);
+                  setTwoFactorDevCode('');
+                  setAuthMessage('2FA verification canceled. Login again to request a new code.');
+                }}
+              >
+                Cancel 2FA
+              </button>
+            ) : null}
+          </>
+        )}
         {authMessage ? <p className="status">{authMessage}</p> : null}
       </form>
+    );
+  }
+
+  function renderSparkline(values, stroke = '#dbb674') {
+    const width = 160;
+    const height = 48;
+    const safeValues = values.length ? values : [0, 0, 0, 0, 0];
+    const max = Math.max(...safeValues, 1);
+    const min = Math.min(...safeValues, 0);
+    const range = max - min || 1;
+    const points = safeValues
+      .map((value, idx) => {
+        const x = (idx / (safeValues.length - 1 || 1)) * (width - 8) + 4;
+        const y = height - 6 - ((value - min) / range) * (height - 12);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+    return (
+      <svg className="sparkline" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+        <polyline points={points} fill="none" stroke={stroke} strokeWidth="2" />
+      </svg>
     );
   }
 
@@ -1034,12 +1190,105 @@ export default function HomePage() {
     }
 
     const canPostListings = ['private_seller', 'business_account'].includes(dashboardData.me?.role || '');
+    const userListings = listings.filter((row) => row.seller_id === dashboardData.me?.id);
+    const activeListings = userListings.filter((row) => row.status === 'active');
+    const pendingListings = userListings.filter((row) => row.moderation_status === 'pending');
+    const draftListings = userListings.filter((row) => row.status === 'draft');
+    const popularityScore = Math.min(
+      100,
+      20 + activeListings.length * 8 + dashboardData.messages.length * 4 + dashboardData.searches.length * 2
+    );
+    const adProgress = userListings.length
+      ? Math.min(100, Math.round((activeListings.length / userListings.length) * 100))
+      : 0;
+    const exposureTrend = userListings.length
+      ? [18, 24, 30, 46, 52, 58, 64]
+      : [10, 14, 18, 16, 22, 20, 26];
+    const inquiryTrend = dashboardData.messages.length
+      ? [6, 12, 18, 22, 16, 24, 28]
+      : [2, 6, 4, 8, 6, 10, 12];
 
     return (
       <section className="section reveal">
         <div className="section-head">
           <h2>Dashboard</h2>
-          <p>Private workspace for your account and activity.</p>
+          <p>Performance analytics, advertisement progress, and account signals.</p>
+        </div>
+        <div className="dashboard-hero">
+          <article className="metric-card">
+            <p className="type">Portfolio</p>
+            <strong>{userListings.length}</strong>
+            <span>Live listings</span>
+          </article>
+          <article className="metric-card">
+            <p className="type">Popularity</p>
+            <strong>{popularityScore}%</strong>
+            <span>Audience interest</span>
+          </article>
+          <article className="metric-card">
+            <p className="type">Ad Progress</p>
+            <strong>{adProgress}%</strong>
+            <span>Approved &amp; active</span>
+          </article>
+          <article className="metric-card">
+            <p className="type">Inquiries</p>
+            <strong>{dashboardData.messages.length}</strong>
+            <span>Last 30 days</span>
+          </article>
+        </div>
+        <div className="dashboard-charts">
+          <article className="panel chart-card">
+            <div>
+              <p className="type">Exposure</p>
+              <h3>Listing visibility trend</h3>
+              <p>Daily views across featured placements.</p>
+            </div>
+            {renderSparkline(exposureTrend)}
+          </article>
+          <article className="panel chart-card">
+            <div>
+              <p className="type">Lead Flow</p>
+              <h3>Inquiry momentum</h3>
+              <p>Outbound buyer interest for your ads.</p>
+            </div>
+            {renderSparkline(inquiryTrend, '#c29a52')}
+          </article>
+          <article className="panel chart-card">
+            <div>
+              <p className="type">Advertisement Progress</p>
+              <h3>Status distribution</h3>
+              <p>Drafts, pending review, and active inventory.</p>
+            </div>
+            <div className="progress-stack">
+              <div>
+                <div className="progress-label">
+                  <span>Active</span>
+                  <span>{activeListings.length}</span>
+                </div>
+                <div className="progress-bar">
+                  <span style={{ width: `${userListings.length ? (activeListings.length / userListings.length) * 100 : 0}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="progress-label">
+                  <span>Pending</span>
+                  <span>{pendingListings.length}</span>
+                </div>
+                <div className="progress-bar">
+                  <span style={{ width: `${userListings.length ? (pendingListings.length / userListings.length) * 100 : 0}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="progress-label">
+                  <span>Draft</span>
+                  <span>{draftListings.length}</span>
+                </div>
+                <div className="progress-bar">
+                  <span style={{ width: `${userListings.length ? (draftListings.length / userListings.length) * 100 : 0}%` }} />
+                </div>
+              </div>
+            </div>
+          </article>
         </div>
         <div className="dashboard-grid">
           <article className="panel">
@@ -1052,7 +1301,7 @@ export default function HomePage() {
                   : 'Loading profile...'}
             </p>
             <p>{dashboardData.me?.email || ''}</p>
-            <p>Role: {dashboardData.me?.role || '-'}</p>
+            <p>Role: {roleLabel(dashboardData.me?.role)}</p>
             <button className="btn-outline compact" onClick={logout}>Logout</button>
           </article>
           <article className="panel">
@@ -1154,6 +1403,62 @@ export default function HomePage() {
     );
   }
 
+  function renderAccountPage() {
+    if (!token) {
+      return (
+        <section className="section reveal">
+          <div className="section-head">
+            <h2>Account Access</h2>
+            <p>Login or register to view your account profile.</p>
+          </div>
+          {renderAuthCard()}
+        </section>
+      );
+    }
+
+    const profile = dashboardData.me;
+
+    return (
+      <section className="section reveal">
+        <div className="section-head">
+          <h2>My Account</h2>
+          <p>Personal profile and contact information.</p>
+        </div>
+        <div className="account-grid">
+          <article className="panel account-card">
+            <p className="type">Profile</p>
+            <h3>{profile ? `${profile.first_name} ${profile.last_name}` : 'Loading profile...'}</h3>
+            <ul className="account-list">
+              <li><span>Email</span><strong>{profile?.email || '-'}</strong></li>
+              <li><span>Phone</span><strong>{profile?.phone || '-'}</strong></li>
+              <li><span>Role</span><strong>{roleLabel(profile?.role)}</strong></li>
+              <li><span>Status</span><strong>{profile?.is_active ? 'Active' : 'Suspended'}</strong></li>
+            </ul>
+          </article>
+          <article className="panel account-card">
+            <p className="type">Preferences</p>
+            <h3>Saved Preferences</h3>
+            <ul className="account-list">
+              <li><span>Currency</span><strong>{profile?.preferred_currency || '-'}</strong></li>
+              <li><span>Language</span><strong>{profile?.preferred_language || '-'}</strong></li>
+              <li><span>Measurement</span><strong>{profile?.measurement_system || '-'}</strong></li>
+            </ul>
+          </article>
+          <article className="panel account-card">
+            <p className="type">Security</p>
+            <h3>Verification</h3>
+            <ul className="account-list">
+              <li><span>Email verified</span><strong>{profile?.is_email_verified ? 'Yes' : 'No'}</strong></li>
+              <li><span>2FA enabled</span><strong>{profile?.is_2fa_enabled ? 'Yes' : 'No'}</strong></li>
+              <li><span>Business verified</span><strong>{profile?.is_verified_business ? 'Yes' : 'No'}</strong></li>
+            </ul>
+            <button className="btn-outline compact" onClick={logout}>Logout</button>
+          </article>
+        </div>
+      </section>
+    );
+  }
+
   function renderPage() {
     switch (route.page) {
       case 'listings':
@@ -1168,16 +1473,34 @@ export default function HomePage() {
         return renderConciergePage();
       case 'dashboard':
         return renderDashboardPage();
+      case 'account':
+        return renderAccountPage();
       default:
         return renderHomePage();
     }
   }
+
+  const authNavLinks = token
+    ? [
+      { path: '/dashboard', label: 'Dashboard' },
+      { path: '/account', label: 'My Account' }
+    ]
+    : [{ path: '/dashboard', label: 'Login / Register' }];
 
   return (
     <div className="lux-shell">
       <header className={`top-nav ${isScrolled ? 'scrolled' : ''}`}>
         <div className="top-nav-main">
           <a href="/" className="brand" onClick={(e) => onNavClick(e, '/')}>Luxline</a>
+          <nav className="nav-ribbon">
+            {[...NAV_LINKS, ...authNavLinks].map((link) => (
+              <a key={link.path} href={link.path} onClick={(e) => onNavClick(e, link.path)} className={route.page === (link.path === '/' ? 'home' : link.path.slice(1)) ? 'active' : ''}>
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+        <div className="ai-ask-ribbon">
           <form className="ai-ask-inline" onSubmit={submitAiAsk}>
             <input
               id="ai-ask-input"
@@ -1189,14 +1512,6 @@ export default function HomePage() {
             <button type="submit">Ask</button>
           </form>
         </div>
-        <nav className="nav-ribbon">
-          {NAV_LINKS.map((link) => (
-            <a key={link.path} href={link.path} onClick={(e) => onNavClick(e, link.path)} className={route.page === (link.path === '/' ? 'home' : link.path.slice(1)) ? 'active' : ''}>
-              {link.label}
-            </a>
-          ))}
-          <a href="/account" onClick={(e) => onNavClick(e, '/dashboard')}>{token ? 'My Account' : 'Login'}</a>
-        </nav>
       </header>
 
       <main>{renderPage()}</main>
