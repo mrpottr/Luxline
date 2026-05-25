@@ -25,6 +25,13 @@ class Settings:
     cors_origins: str = os.getenv("CORS_ORIGINS", "*")
     default_currency: str = os.getenv("DEFAULT_CURRENCY", "USD")
     stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "")
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
+    email_from: str = os.getenv("EMAIL_FROM", "")
+    email_from_name: str = os.getenv("EMAIL_FROM_NAME", "")
 
 
 settings = Settings()

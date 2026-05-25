@@ -17,9 +17,14 @@ class LoginResponse(BaseModel):
     access_token: str | None = None
     token_type: str = "bearer"
     requires_2fa: bool = False
+    requires_email_verification: bool = False
     challenge_id: int | None = None
     otp_expires_in_seconds: int | None = None
     otp_code_dev_only: str | None = None
+    email_verification_id: int | None = None
+    email_otp_expires_in_seconds: int | None = None
+    email_otp_code_dev_only: str | None = None
+    email_sent: bool | None = None
 
 
 class RegisterRequest(BaseModel):
@@ -41,6 +46,15 @@ class TwoFactorVerifyRequest(BaseModel):
     code: str = Field(min_length=6, max_length=6)
 
 
+class EmailVerificationRequest(BaseModel):
+    verification_id: int
+    code: str = Field(min_length=6, max_length=6)
+
+
+class EmailVerificationResendRequest(BaseModel):
+    email: EmailStr
+
+
 class SocialLoginRequest(BaseModel):
     provider: str = Field(description="google|apple")
     id_token: str = Field(min_length=10)
@@ -60,12 +74,22 @@ class UserOut(BaseModel):
     phone: str | None
     role: UserRole
     is_active: bool
+    is_email_verified: bool
     is_verified_business: bool
     is_2fa_enabled: bool
     preferred_currency: str
     preferred_language: str
     measurement_system: str
     created_at: datetime
+
+
+class RegisterResponse(BaseModel):
+    user: UserOut
+    verification_required: bool = True
+    email_verification_id: int
+    email_otp_expires_in_seconds: int
+    email_otp_code_dev_only: str | None = None
+    email_sent: bool = True
 
 
 class UserPreferencesUpdate(BaseModel):

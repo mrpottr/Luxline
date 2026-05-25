@@ -67,6 +67,7 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(32))
     role: Mapped[UserRole] = mapped_column(SQLEnum(UserRole), nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified_business: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     preferred_currency: Mapped[str] = mapped_column(String(8), default="USD", nullable=False)
@@ -92,6 +93,7 @@ class User(Base):
     audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="actor")
     social_accounts: Mapped[list["SocialAccount"]] = relationship(back_populates="user")
     two_factor_challenges: Mapped[list["TwoFactorChallenge"]] = relationship(back_populates="user")
+    email_verification_challenges: Mapped[list["EmailVerificationChallenge"]] = relationship(back_populates="user")
 
 
 class AgencyProfile(Base):
@@ -328,3 +330,16 @@ class TwoFactorChallenge(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="two_factor_challenges")
+
+
+class EmailVerificationChallenge(Base):
+    __tablename__ = "email_verification_challenges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="email_verification_challenges")
