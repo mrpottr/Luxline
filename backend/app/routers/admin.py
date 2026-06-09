@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import requests
 
 from backend.app.core.security import hash_password
 from backend.app.db.session import get_db
@@ -122,3 +123,34 @@ def admin_update_user_role(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.get("/monitoring/metrics")
+def get_monitoring_metrics(
+    _admin: User = Depends(require_roles(UserRole.super_admin)),
+):
+    """Get raw Prometheus metrics for admin dashboard."""
+    try:
+        response = requests.get("http://prometheus:9090/api/v1/query", params={"query": "luxline_requests_total"}, timeout=5)
+        return {"status": "ok", "data": response.json()}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@router.get("/monitoring/health")
+def get_monitoring_health(
+    _admin: User = Depends(require_roles(UserRole.super_admin)),
+):
+    """Get overall system health metrics."""
+    try:
+        prom_response = requests.get("http://prometheus:9090/-/healthy", timeout=5)
+        grafana_response = requests.get("http://grafana:3000/api/health", timeout=5)
+        
+        return {
+            "prometheus": "healthy" if prom_response.status_code == 200 else "unhealthy",
+            "grafana": "healthy" if grafana_response.status_code == 200 else "unhealthy",
+            "grafana_url": "http://localhost:3000",
+            "prometheus_url": "http://localhost:9090",
+        }
+    except Exception as e:
+        return {"error": str(e)}
