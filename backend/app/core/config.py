@@ -32,6 +32,9 @@ class Settings:
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
     email_from: str = os.getenv("EMAIL_FROM", "")
     email_from_name: str = os.getenv("EMAIL_FROM_NAME", "")
+    admin_bootstrap_enabled: bool = os.getenv("ADMIN_BOOTSTRAP_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+    admin_email: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
+    admin_password: str = os.getenv("ADMIN_PASSWORD", "admin123")
 
 
 settings = Settings()
