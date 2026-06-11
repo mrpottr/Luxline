@@ -61,6 +61,12 @@ function roleLabel(value) {
   return map[value] || String(value || '').replaceAll('_', ' ');
 }
 
+function titleCase(value) {
+  return String(value || '')
+    .replaceAll('_', ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -133,8 +139,21 @@ export default function HomePage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorExpiresIn, setTwoFactorExpiresIn] = useState(null);
   const [twoFactorDevCode, setTwoFactorDevCode] = useState('');
-  const [dashboardData, setDashboardData] = useState({ me: null, searches: [], messages: [], alerts: [] });
+  const [dashboardData, setDashboardData] = useState({
+    me: null,
+    searches: [],
+    messages: [],
+    alerts: [],
+    savedListings: [],
+    accountSummary: null,
+    adminOverview: null,
+    auditLogs: [],
+    moderationQueue: []
+  });
   const [dashboardError, setDashboardError] = useState('');
+  const [accountRefreshKey, setAccountRefreshKey] = useState(0);
+  const [accountActionStatus, setAccountActionStatus] = useState('');
+  const [newSavedSearchName, setNewSavedSearchName] = useState('');
 
   const [listingForm, setListingForm] = useState({
     title: '',
@@ -346,21 +365,53 @@ export default function HomePage() {
     let cancelled = false;
     async function loadDashboard() {
       try {
-        const [me, searches, messages, alerts] = await Promise.all([
-          callApi(`${API_BASE}/users/me`, {}, token),
+        const me = await callApi(`${API_BASE}/users/me`, {}, token);
+        const [accountSummary, savedListings, searches, messages, alerts] = await Promise.all([
+          callApi(`${API_BASE}/users/me/account-summary`, {}, token),
+          callApi(`${API_BASE}/users/me/saved-listings`, {}, token),
           callApi(`${API_BASE}/users/me/saved-searches`, {}, token),
           callApi(`${API_BASE}/users/me/messages`, {}, token),
           callApi(`${API_BASE}/users/me/alerts`, {}, token)
         ]);
+        let adminOverview = null;
+        let auditLogs = [];
+        let moderationQueue = [];
+        if (me.role === 'super_admin') {
+          [adminOverview, auditLogs, moderationQueue] = await Promise.all([
+            callApi(`${API_BASE}/admin/overview`, {}, token),
+            callApi(`${API_BASE}/admin/audit-logs?limit=12`, {}, token),
+            callApi(`${API_BASE}/admin/moderation-queue`, {}, token)
+          ]);
+        }
         if (cancelled) return;
-        setDashboardData({ me, searches, messages, alerts });
+        setDashboardData({
+          me,
+          searches: accountSummary?.saved_searches || searches,
+          messages: accountSummary?.inquiries || messages,
+          alerts: accountSummary?.alerts || alerts,
+          savedListings: accountSummary?.saved_listings || savedListings,
+          accountSummary,
+          adminOverview,
+          auditLogs,
+          moderationQueue
+        });
         setDashboardError('');
       } catch (err) {
         if (cancelled) return;
         if (err?.status === 401) {
           localStorage.removeItem('luxline_token');
           setToken('');
-          setDashboardData({ me: null, searches: [], messages: [], alerts: [] });
+          setDashboardData({
+            me: null,
+            searches: [],
+            messages: [],
+            alerts: [],
+            savedListings: [],
+            accountSummary: null,
+            adminOverview: null,
+            auditLogs: [],
+            moderationQueue: []
+          });
           setDashboardError('Session expired. Please sign in again.');
           return;
         }
@@ -371,7 +422,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [route.page, token]);
+  }, [route.page, token, accountRefreshKey]);
 
   function navigate(path) {
     if (window.location.pathname === path) return;
@@ -381,6 +432,7 @@ export default function HomePage() {
   }
 
   function onNavClick(event, path) {
+    if (path === '/admin') return;
     event.preventDefault();
     navigate(path);
   }
@@ -629,8 +681,117 @@ export default function HomePage() {
     setTwoFactorCode('');
     setTwoFactorExpiresIn(null);
     setTwoFactorDevCode('');
-    setDashboardData({ me: null, searches: [], messages: [], alerts: [] });
+    setDashboardData({
+      me: null,
+      searches: [],
+      messages: [],
+      alerts: [],
+      savedListings: [],
+      accountSummary: null,
+      adminOverview: null,
+      auditLogs: [],
+      moderationQueue: []
+    });
+    setAccountActionStatus('');
     navigate('/');
+  }
+
+  async function saveListingForAccount(listingId) {
+    if (!token) {
+      navigate('/dashboard');
+      return;
+    }
+    setAccountActionStatus('Saving listing...');
+    try {
+      await callApi(`${API_BASE}/users/me/saved-listings/${listingId}`, { method: 'POST' }, token);
+      setAccountActionStatus('Listing saved to your account.');
+      setAccountRefreshKey((value) => value + 1);
+    } catch (err) {
+      setAccountActionStatus(err.message);
+    }
+  }
+
+  async function removeSavedListing(listingId) {
+    setAccountActionStatus('Removing saved listing...');
+    try {
+      await callApi(`${API_BASE}/users/me/saved-listings/${listingId}`, { method: 'DELETE' }, token);
+      setAccountActionStatus('Saved listing removed.');
+      setAccountRefreshKey((value) => value + 1);
+    } catch (err) {
+      setAccountActionStatus(err.message);
+    }
+  }
+
+  async function saveCurrentSearch(event) {
+    event.preventDefault();
+    const filters = {
+      search,
+      category,
+      currency: selectedCurrency,
+      continent,
+      country,
+      stateProvince
+    };
+    const hasFilters = Object.values(filters).some(Boolean);
+    setAccountActionStatus('Saving search...');
+    try {
+      await callApi(`${API_BASE}/users/me/saved-searches`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newSavedSearchName.trim() || (hasFilters ? 'Current account search' : 'All luxury inventory'),
+          filters,
+          alert_enabled: true
+        })
+      }, token);
+      setNewSavedSearchName('');
+      setAccountActionStatus('Saved search created with alerts enabled.');
+      setAccountRefreshKey((value) => value + 1);
+    } catch (err) {
+      setAccountActionStatus(err.message);
+    }
+  }
+
+  async function updatePreference(field, value) {
+    setAccountActionStatus('Updating preference...');
+    try {
+      await callApi(`${API_BASE}/users/me/preferences`, {
+        method: 'PATCH',
+        body: JSON.stringify({ [field]: value })
+      }, token);
+      setAccountActionStatus('Preference updated.');
+      setAccountRefreshKey((count) => count + 1);
+    } catch (err) {
+      setAccountActionStatus(err.message);
+    }
+  }
+
+  async function toggleAlertPreference(channel, enabled) {
+    setAccountActionStatus('Updating alert preference...');
+    try {
+      await callApi(`${API_BASE}/users/me/alerts`, {
+        method: 'PUT',
+        body: JSON.stringify({ channel, enabled })
+      }, token);
+      setAccountActionStatus('Alert preference updated.');
+      setAccountRefreshKey((count) => count + 1);
+    } catch (err) {
+      setAccountActionStatus(err.message);
+    }
+  }
+
+  async function moderateListing(listingId, action) {
+    const actionLabel = action === 'approve' ? 'Approving' : 'Rejecting';
+    const doneLabel = action === 'approve' ? 'approved' : 'rejected';
+    setAccountActionStatus(`${actionLabel} listing...`);
+    try {
+      await callApi(`${API_BASE}/admin/listings/${listingId}/${action}`, {
+        method: 'POST'
+      }, token);
+      setAccountActionStatus(`Listing ${doneLabel}.`);
+      setAccountRefreshKey((count) => count + 1);
+    } catch (err) {
+      setAccountActionStatus(err.message);
+    }
   }
 
   async function createListing(event) {
@@ -704,6 +865,7 @@ export default function HomePage() {
   }
 
   function renderListingGrid(rows) {
+    const savedListingIds = new Set((dashboardData.savedListings || []).map((item) => item.listing_id));
     return (
       <div className="listing-grid reveal">
         {rows.map((row, idx) => (
@@ -714,6 +876,16 @@ export default function HomePage() {
               <h3>{row.title}</h3>
               <p>{[row.make, row.model, row.location_city, row.location_country].filter(Boolean).join(' · ')}</p>
               <strong>{money(row.price, selectedCurrency || row.currency)}</strong>
+              <button
+                className="btn-outline compact"
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  saveListingForAccount(row.id);
+                }}
+              >
+                {savedListingIds.has(row.id) ? 'Saved' : 'Save Asset'}
+              </button>
             </div>
           </article>
         ))}
@@ -1417,12 +1589,69 @@ export default function HomePage() {
     }
 
     const profile = dashboardData.me;
+    const summary = dashboardData.accountSummary || {};
+    const savedListings = dashboardData.savedListings || [];
+    const searches = dashboardData.searches || [];
+    const messages = dashboardData.messages || [];
+    const alerts = dashboardData.alerts || [];
+    const adminOverview = dashboardData.adminOverview;
+    const moderationQueue = dashboardData.moderationQueue || [];
+    const isAdmin = profile?.role === 'super_admin';
+    const alertEnabled = (channel) => Boolean(alerts.find((item) => item.channel === channel)?.enabled);
+    const completion = summary.profile_completion ?? 0;
+    const formatDate = (value) => (value ? new Date(value).toLocaleString() : '-');
+    const recentActivity = [
+      ...savedListings.slice(0, 2).map((item) => ({
+        id: `saved-${item.id}`,
+        label: 'Saved Listing',
+        text: item.listing?.title || `Listing #${item.listing_id}`,
+        date: item.saved_at
+      })),
+      ...searches.slice(0, 2).map((item) => ({
+        id: `search-${item.id}`,
+        label: item.alert_enabled ? 'Search Alert' : 'Saved Search',
+        text: item.name,
+        date: item.created_at
+      })),
+      ...messages.slice(0, 3).map((item) => ({
+        id: `message-${item.id}`,
+        label: `Inquiry ${titleCase(item.status || 'sent')}`,
+        text: `Listing #${item.listing_id}`,
+        date: item.replied_at || item.viewed_at || item.created_at
+      }))
+    ]
+      .filter((item) => item.text)
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+      .slice(0, 5);
 
     return (
       <section className="section reveal">
         <div className="section-head">
           <h2>My Account</h2>
-          <p>Personal profile and contact information.</p>
+          <p>Profile, preferences, saved activity, alerts, and role-based controls.</p>
+        </div>
+        {accountActionStatus ? <p className="status">{accountActionStatus}</p> : null}
+        <div className="dashboard-hero account-metrics">
+          <article className="metric-card">
+            <p className="type">Profile</p>
+            <strong>{completion}%</strong>
+            <span>Completion</span>
+          </article>
+          <article className="metric-card">
+            <p className="type">Saved Assets</p>
+            <strong>{summary.saved_listing_count ?? savedListings.length}</strong>
+            <span>Watchlist</span>
+          </article>
+          <article className="metric-card">
+            <p className="type">Searches</p>
+            <strong>{summary.saved_search_count ?? searches.length}</strong>
+            <span>Reusable filters</span>
+          </article>
+          <article className="metric-card">
+            <p className="type">Inquiries</p>
+            <strong>{summary.inquiry_count ?? messages.length}</strong>
+            <span>Buyer and seller messages</span>
+          </article>
         </div>
         <div className="account-grid">
           <article className="panel account-card">
@@ -1438,23 +1667,199 @@ export default function HomePage() {
           <article className="panel account-card">
             <p className="type">Preferences</p>
             <h3>Saved Preferences</h3>
-            <ul className="account-list">
-              <li><span>Currency</span><strong>{profile?.preferred_currency || '-'}</strong></li>
-              <li><span>Language</span><strong>{profile?.preferred_language || '-'}</strong></li>
-              <li><span>Measurement</span><strong>{profile?.measurement_system || '-'}</strong></li>
-            </ul>
+            <label>
+              <span>Currency</span>
+              <select value={profile?.preferred_currency || 'USD'} onChange={(e) => updatePreference('preferred_currency', e.target.value)}>
+                {currencies.map((code) => <option key={code} value={code}>{code}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Language</span>
+              <select value={profile?.preferred_language || 'en'} onChange={(e) => updatePreference('preferred_language', e.target.value)}>
+                <option value="en">English</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="ar">Arabic</option>
+              </select>
+            </label>
+            <label>
+              <span>Measurement</span>
+              <select value={profile?.measurement_system || 'imperial'} onChange={(e) => updatePreference('measurement_system', e.target.value)}>
+                <option value="imperial">Imperial</option>
+                <option value="metric">Metric</option>
+              </select>
+            </label>
           </article>
           <article className="panel account-card">
             <p className="type">Security</p>
             <h3>Verification</h3>
             <ul className="account-list">
               <li><span>Email verified</span><strong>{profile?.is_email_verified ? 'Yes' : 'No'}</strong></li>
+              <li><span>Phone on file</span><strong>{profile?.phone ? 'Yes' : 'No'}</strong></li>
               <li><span>2FA enabled</span><strong>{profile?.is_2fa_enabled ? 'Yes' : 'No'}</strong></li>
-              <li><span>Business verified</span><strong>{profile?.is_verified_business ? 'Yes' : 'No'}</strong></li>
+              <li><span>Identity check</span><strong>{profile?.is_verified_business || isAdmin ? 'Verified' : 'Not submitted'}</strong></li>
             </ul>
             <button className="btn-outline compact" onClick={logout}>Logout</button>
           </article>
         </div>
+        <div className="account-workspace-grid">
+          <article className="panel account-card">
+            <p className="type">Saved Assets</p>
+            <h3>Asset Watchlist</h3>
+            <div className="account-stack">
+              {savedListings.length ? savedListings.slice(0, 6).map((item) => (
+                <div key={item.id} className="account-row">
+                  <div>
+                    <strong>{item.listing?.title || `Listing #${item.listing_id}`}</strong>
+                    <p>
+                      {item.listing
+                        ? [categoryLabel(item.listing.category), item.listing.location_city, item.listing.location_country].filter(Boolean).join(' · ')
+                        : 'Listing details unavailable'}
+                    </p>
+                  </div>
+                  <div className="account-row-actions">
+                    {item.listing ? (
+                      <button className="btn-outline compact" type="button" onClick={() => openListing(item.listing)}>Open</button>
+                    ) : null}
+                    <button className="btn-outline compact" type="button" onClick={() => removeSavedListing(item.listing_id)}>Remove</button>
+                  </div>
+                </div>
+              )) : <p>No saved assets yet. Use Save Asset from any listing card.</p>}
+            </div>
+          </article>
+          <article className="panel account-card">
+            <p className="type">Saved Searches</p>
+            <h3>Reusable Search Filters</h3>
+            <form className="inline-account-form" onSubmit={saveCurrentSearch}>
+              <input
+                placeholder="Search name"
+                value={newSavedSearchName}
+                onChange={(e) => setNewSavedSearchName(e.target.value)}
+              />
+              <button className="btn-solid" type="submit">Save Current Search</button>
+            </form>
+            <div className="account-stack">
+              {searches.length ? searches.slice(0, 5).map((item) => (
+                <div key={item.id} className="account-row">
+                  <div>
+                    <strong>{item.name}</strong>
+                    <p>{Object.entries(item.filters || {}).filter(([, value]) => Boolean(value)).map(([key, value]) => `${key}: ${value}`).join(' · ') || 'All inventory'}</p>
+                  </div>
+                  <span>{item.alert_enabled ? 'Alerts on' : 'Alerts off'}</span>
+                </div>
+              )) : <p>No saved searches yet.</p>}
+            </div>
+          </article>
+          <article className="panel account-card">
+            <p className="type">Alerts</p>
+            <h3>Notification Channels</h3>
+            <div className="alert-toggle-list">
+              {['email', 'sms', 'push'].map((channel) => (
+                <label key={channel} className="alert-toggle">
+                  <span>{channel.toUpperCase()}</span>
+                  <input
+                    type="checkbox"
+                    checked={alertEnabled(channel)}
+                    onChange={(e) => toggleAlertPreference(channel, e.target.checked)}
+                  />
+                </label>
+              ))}
+            </div>
+          </article>
+          <article className="panel account-card">
+            <p className="type">Inquiry History</p>
+            <h3>Messages</h3>
+            <div className="account-stack">
+              {messages.length ? messages.slice(0, 6).map((item) => (
+                <div key={item.id} className="account-row">
+                  <div>
+                    <strong>Listing #{item.listing_id}</strong>
+                    <p>{item.message}</p>
+                  </div>
+                  <div className="account-row-actions">
+                    <span className={`status-pill ${item.status || 'sent'}`}>{titleCase(item.status || 'sent')}</span>
+                    <span>{formatDate(item.replied_at || item.viewed_at || item.created_at)}</span>
+                  </div>
+                </div>
+              )) : <p>No inquiry history yet.</p>}
+            </div>
+          </article>
+          <article className="panel account-card">
+            <p className="type">Activity</p>
+            <h3>Role-Based Activity</h3>
+            <div className="account-stack">
+              {recentActivity.length ? recentActivity.map((item) => (
+                <div key={item.id} className="account-row">
+                  <div>
+                    <strong>{item.label}</strong>
+                    <p>{item.text}</p>
+                  </div>
+                  <span>{formatDate(item.date)}</span>
+                </div>
+              )) : <p>No account activity yet.</p>}
+            </div>
+          </article>
+        </div>
+        {isAdmin && adminOverview ? (
+          <>
+            <div className="section-head account-subhead">
+              <h2>Admin Workspace</h2>
+              <p>Platform metrics, moderation signals, and privileged activity.</p>
+            </div>
+            <div className="dashboard-hero account-metrics">
+              <article className="metric-card"><p className="type">Users</p><strong>{adminOverview.total_users}</strong><span>{adminOverview.active_users} active</span></article>
+              <article className="metric-card"><p className="type">Listings</p><strong>{adminOverview.total_listings}</strong><span>{adminOverview.pending_listings} pending</span></article>
+              <article className="metric-card"><p className="type">Inquiries</p><strong>{adminOverview.inquiry_count}</strong><span>Lead activity</span></article>
+              <article className="metric-card"><p className="type">Business Review</p><strong>{adminOverview.pending_business_verifications}</strong><span>Pending checks</span></article>
+            </div>
+            <div className="account-workspace-grid admin-account-grid">
+              <article className="panel account-card">
+                <p className="type">Admin Identity</p>
+                <h3>{profile ? `${profile.first_name} ${profile.last_name}` : 'Administrator'}</h3>
+                <ul className="account-list">
+                  <li><span>Role</span><strong>{roleLabel(profile?.role)}</strong></li>
+                  <li><span>Permissions</span><strong>Users, Listings, Audit</strong></li>
+                  <li><span>Account status</span><strong>{profile?.is_active ? 'Active' : 'Suspended'}</strong></li>
+                  <li><span>Last login</span><strong>Current session</strong></li>
+                </ul>
+              </article>
+              <article className="panel account-card">
+                <p className="type">Moderation</p>
+                <h3>Pending Review Queue</h3>
+                <div className="account-stack">
+                  {moderationQueue.length ? moderationQueue.slice(0, 5).map((listing) => (
+                    <div key={listing.id} className="account-row">
+                      <div>
+                        <strong>{listing.title}</strong>
+                        <p>{[categoryLabel(listing.category), listing.location_city, listing.location_country].filter(Boolean).join(' · ') || 'Pending listing'}</p>
+                      </div>
+                      <div className="account-row-actions">
+                        <button className="btn-outline compact" type="button" onClick={() => moderateListing(listing.id, 'approve')}>Approve</button>
+                        <button className="btn-outline compact" type="button" onClick={() => moderateListing(listing.id, 'reject')}>Reject</button>
+                      </div>
+                    </div>
+                  )) : <p>No listings waiting for review.</p>}
+                </div>
+              </article>
+              <article className="panel account-card">
+                <p className="type">Audit Logs</p>
+                <h3>Recent Admin Activity</h3>
+                <div className="account-stack">
+                  {(dashboardData.auditLogs || []).length ? dashboardData.auditLogs.map((log) => (
+                    <div key={log.id} className="account-row">
+                      <div>
+                        <strong>{log.event_type}</strong>
+                        <p>{JSON.stringify(log.details || {})}</p>
+                      </div>
+                      <span>{formatDate(log.created_at)}</span>
+                    </div>
+                  )) : <p>No audit activity yet.</p>}
+                </div>
+              </article>
+            </div>
+          </>
+        ) : null}
+        {dashboardError ? <p className="status error">{dashboardError}</p> : null}
       </section>
     );
   }
@@ -1483,7 +1888,8 @@ export default function HomePage() {
   const authNavLinks = token
     ? [
       { path: '/dashboard', label: 'Dashboard' },
-      { path: '/account', label: 'My Account' }
+      { path: '/account', label: 'My Account' },
+      { path: '/admin', label: 'Admin' }
     ]
     : [{ path: '/dashboard', label: 'Login / Register' }];
 
@@ -1523,4 +1929,3 @@ export default function HomePage() {
     </div>
   );
 }
-
