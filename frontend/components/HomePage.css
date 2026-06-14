@@ -143,17 +143,21 @@ body {
   text-transform: uppercase;
 }
 
-.section,
-.lux-hero {
-  margin: 0 auto;
-  max-width: 1520px;
+.section {
+  margin: 0;
+  max-width: none;
   padding: 4rem 4vw;
+  width: 100%;
 }
 
 .lux-hero {
+  margin: 0;
+  max-width: none;
   min-height: 76vh;
   overflow: hidden;
+  padding: 4rem 4vw;
   position: relative;
+  width: 100%;
 }
 
 .lux-hero::after {
@@ -547,7 +551,8 @@ body {
 }
 
 .panel.form {
-  max-width: 760px;
+  max-width: none;
+  width: 100%;
 }
 
 .post-ad-panel {
@@ -655,6 +660,25 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.account-metrics {
+  margin: 1.5rem 0;
+}
+
+.account-workspace-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.admin-account-grid {
+  grid-template-columns: 1fr;
+}
+
+.account-subhead {
+  margin-top: 3rem;
+}
+
 .account-card {
   gap: 1rem;
   padding: 1.2rem 1.25rem;
@@ -663,6 +687,35 @@ body {
 
 .account-card h3 {
   margin: 0.2rem 0 0.2rem;
+}
+
+.account-card label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.account-card label span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-card select,
+.inline-account-form input {
+  background: rgba(10, 14, 19, 0.8);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  min-width: 0;
+  padding: 0.8rem;
+  width: 100%;
+}
+
+.account-card select:focus,
+.inline-account-form input:focus {
+  border-color: var(--gold-strong);
+  outline: none;
 }
 
 .account-list {
@@ -697,6 +750,110 @@ body {
 .account-list strong {
   color: var(--text);
   font-weight: 600;
+}
+
+.account-stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.account-row {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-bottom: 0.75rem;
+}
+
+.account-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.account-row strong {
+  color: var(--text);
+}
+
+.account-row p {
+  margin: 0.25rem 0 0;
+}
+
+.account-row > span {
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.account-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.account-row-actions > span:not(.status-pill) {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.status-pill {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.status-pill.sent {
+  background: rgba(219, 182, 116, 0.12);
+  color: var(--gold-strong);
+}
+
+.status-pill.viewed {
+  background: rgba(96, 165, 250, 0.14);
+  color: #93c5fd;
+}
+
+.status-pill.replied {
+  background: rgba(52, 211, 153, 0.14);
+  color: #86efac;
+}
+
+.inline-account-form {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr auto;
+}
+
+.alert-toggle-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.alert-toggle {
+  align-items: center;
+  background: rgba(10, 14, 19, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  padding: 0.8rem;
+}
+
+.alert-toggle input {
+  accent-color: var(--gold-strong);
+  height: 1.1rem;
+  width: 1.1rem;
 }
 
 .status.error {
@@ -758,13 +915,30 @@ body {
   .category-hubs,
   .service-grid,
   .stat-ribbon,
-  .journal-grid,
-  .dashboard-grid,
-  .dashboard-hero,
-  .dashboard-charts,
-  .account-grid,
-  .detail-card {
+    .journal-grid,
+    .dashboard-grid,
+    .dashboard-hero,
+    .dashboard-charts,
+    .account-grid,
+    .account-workspace-grid,
+    .detail-card {
     grid-template-columns: 1fr;
+  }
+
+  .account-row,
+  .inline-account-form {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .account-row {
+    flex-direction: column;
+  }
+
+  .account-row > span,
+  .account-row-actions {
+    text-align: left;
+    width: 100%;
   }
 
   .listing-card.large {

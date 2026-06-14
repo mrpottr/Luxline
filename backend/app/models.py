@@ -233,6 +233,9 @@ class Inquiry(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(32))
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="sent", nullable=False, index=True)
+    viewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     listing: Mapped["Listing"] = relationship(back_populates="inquiries")

@@ -6,11 +6,13 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
 from backend.app.dependencies import get_current_user, require_roles
-from backend.app.models import AlertPreference, Inquiry, SavedListing, SavedSearch, User, UserRole
+from backend.app.models import AlertPreference, Inquiry, Listing, SavedListing, SavedSearch, User, UserRole
 from backend.app.schemas import (
+    AccountSummaryOut,
     AlertPreferenceOut,
     AlertPreferenceUpdate,
     InquiryOut,
+    SavedListingDetailOut,
     SavedSearchCreate,
     SavedSearchOut,
     UserOut,
@@ -19,6 +21,41 @@ from backend.app.schemas import (
 
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+def _profile_completion(user: User, alert_count: int, saved_search_count: int) -> int:
+    checks = [
+        bool(user.first_name),
+        bool(user.last_name),
+        bool(user.email),
+        bool(user.phone),
+        bool(user.is_email_verified),
+        bool(user.preferred_currency),
+        bool(user.preferred_language),
+        bool(user.measurement_system),
+        alert_count > 0,
+        saved_search_count > 0,
+    ]
+    return round((sum(checks) / len(checks)) * 100)
+
+
+def _saved_listing_details(db: Session, user_id: int) -> list[dict]:
+    rows = (
+        db.query(SavedListing, Listing)
+        .join(Listing, Listing.id == SavedListing.listing_id)
+        .filter(SavedListing.user_id == user_id)
+        .order_by(SavedListing.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": saved.id,
+            "listing_id": saved.listing_id,
+            "saved_at": saved.created_at,
+            "listing": listing,
+        }
+        for saved, listing in rows
+    ]
 
 
 @router.get("/me", response_model=UserOut)
@@ -45,11 +82,64 @@ def update_preferences(
     return current_user
 
 
-@router.get("/me/saved-listings")
+@router.get("/me/saved-listings", response_model=list[SavedListingDetailOut])
 def get_saved_listings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Return listing IDs the user has saved for later review."""
-    rows = db.query(SavedListing).filter(SavedListing.user_id == current_user.id).all()
-    return {"items": [{"id": row.id, "listing_id": row.listing_id, "saved_at": row.created_at} for row in rows]}
+    """Return saved listings with listing details for the account workspace."""
+    return _saved_listing_details(db, current_user.id)
+
+
+@router.post("/me/saved-listings/{listing_id}", response_model=SavedListingDetailOut, status_code=status.HTTP_201_CREATED)
+def save_listing_to_account(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save a listing from the account API surface and return the saved item."""
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    existing = (
+        db.query(SavedListing)
+        .filter(SavedListing.user_id == current_user.id, SavedListing.listing_id == listing_id)
+        .first()
+    )
+    if existing:
+        return {
+            "id": existing.id,
+            "listing_id": existing.listing_id,
+            "saved_at": existing.created_at,
+            "listing": listing,
+        }
+
+    saved = SavedListing(user_id=current_user.id, listing_id=listing_id)
+    db.add(saved)
+    db.commit()
+    db.refresh(saved)
+    return {
+        "id": saved.id,
+        "listing_id": saved.listing_id,
+        "saved_at": saved.created_at,
+        "listing": listing,
+    }
+
+
+@router.delete("/me/saved-listings/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_saved_listing(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a listing from the authenticated user's saved-listings collection."""
+    saved = (
+        db.query(SavedListing)
+        .filter(SavedListing.user_id == current_user.id, SavedListing.listing_id == listing_id)
+        .first()
+    )
+    if not saved:
+        raise HTTPException(status_code=404, detail="Saved listing not found")
+    db.delete(saved)
+    db.commit()
+    return None
 
 
 @router.post("/me/saved-searches", response_model=SavedSearchOut, status_code=status.HTTP_201_CREATED)
@@ -119,6 +209,40 @@ def get_message_history(db: Session = Depends(get_db), current_user: User = Depe
         .limit(250)
         .all()
     )
+
+
+@router.get("/me/account-summary", response_model=AccountSummaryOut)
+def get_account_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Return the account workspace data used by the frontend account page."""
+    saved_searches = (
+        db.query(SavedSearch)
+        .filter(SavedSearch.user_id == current_user.id)
+        .order_by(SavedSearch.created_at.desc())
+        .all()
+    )
+    inquiries = (
+        db.query(Inquiry)
+        .filter(or_(Inquiry.buyer_id == current_user.id, Inquiry.seller_id == current_user.id))
+        .order_by(Inquiry.created_at.desc())
+        .limit(250)
+        .all()
+    )
+    alerts = db.query(AlertPreference).filter(AlertPreference.user_id == current_user.id).all()
+    saved_listings = _saved_listing_details(db, current_user.id)
+    active_alert_count = len([alert for alert in alerts if alert.enabled])
+
+    return {
+        "profile_completion": _profile_completion(current_user, len(alerts), len(saved_searches)),
+        "saved_listing_count": len(saved_listings),
+        "saved_search_count": len(saved_searches),
+        "inquiry_count": len(inquiries),
+        "alert_count": len(alerts),
+        "active_alert_count": active_alert_count,
+        "saved_listings": saved_listings,
+        "saved_searches": saved_searches,
+        "inquiries": inquiries,
+        "alerts": alerts,
+    }
 
 
 @router.get("", response_model=list[UserOut])

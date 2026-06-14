@@ -273,6 +273,13 @@ class SavedSearchOut(BaseModel):
     created_at: datetime
 
 
+class SavedListingDetailOut(BaseModel):
+    id: int
+    listing_id: int
+    saved_at: datetime
+    listing: ListingOut
+
+
 class AlertPreferenceUpdate(BaseModel):
     channel: str = Field(description="email|push|sms")
     enabled: bool = True
@@ -307,7 +314,23 @@ class InquiryOut(BaseModel):
     email: EmailStr
     phone: str | None
     message: str
+    status: str = "sent"
+    viewed_at: datetime | None = None
+    replied_at: datetime | None = None
     created_at: datetime
+
+
+class AccountSummaryOut(BaseModel):
+    profile_completion: int
+    saved_listing_count: int
+    saved_search_count: int
+    inquiry_count: int
+    alert_count: int
+    active_alert_count: int
+    saved_listings: list[SavedListingDetailOut]
+    saved_searches: list[SavedSearchOut]
+    inquiries: list[InquiryOut]
+    alerts: list[AlertPreferenceOut]
 
 
 class SubscriptionCreate(BaseModel):
@@ -347,3 +370,25 @@ class BlogPostOut(BaseModel):
     podcast_embed_url: str | None
     published: bool
     created_at: datetime
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    actor_user_id: int | None
+    event_type: str
+    details: dict[str, Any]
+    created_at: datetime
+
+
+class AdminOverviewOut(BaseModel):
+    total_users: int
+    active_users: int
+    suspended_users: int
+    total_listings: int
+    active_listings: int
+    pending_listings: int
+    pending_business_verifications: int
+    inquiry_count: int
+    saved_search_count: int
+    recent_audit_logs: list[AuditLogOut]

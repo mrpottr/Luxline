@@ -1,17 +1,52 @@
 """Administrative endpoints for moderation and account operations."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import requests
 
 from backend.app.core.security import hash_password
 from backend.app.db.session import get_db
 from backend.app.dependencies import require_roles
-from backend.app.models import AuditLog, Listing, ModerationStatus, User, UserRole
-from backend.app.schemas import AdminResetPasswordRequest, ListingOut, UserOut, UserRoleUpdate
+from backend.app.models import AuditLog, Inquiry, Listing, ListingStatus, ModerationStatus, SavedSearch, User, UserRole
+from backend.app.schemas import AdminOverviewOut, AdminResetPasswordRequest, AuditLogOut, ListingOut, UserOut, UserRoleUpdate
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/overview", response_model=AdminOverviewOut)
+def admin_overview(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_roles(UserRole.super_admin)),
+):
+    """Return account-page metrics and recent administrative activity for admins."""
+    recent_audit_logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(10).all()
+    return {
+        "total_users": db.query(User).count(),
+        "active_users": db.query(User).filter(User.is_active.is_(True)).count(),
+        "suspended_users": db.query(User).filter(User.is_active.is_(False)).count(),
+        "total_listings": db.query(Listing).count(),
+        "active_listings": db.query(Listing).filter(Listing.status == ListingStatus.active).count(),
+        "pending_listings": db.query(Listing).filter(Listing.moderation_status == ModerationStatus.pending).count(),
+        "pending_business_verifications": (
+            db.query(User)
+            .filter(User.role == UserRole.business_account, User.is_verified_business.is_(False))
+            .count()
+        ),
+        "inquiry_count": db.query(Inquiry).count(),
+        "saved_search_count": db.query(SavedSearch).count(),
+        "recent_audit_logs": recent_audit_logs,
+    }
+
+
+@router.get("/audit-logs", response_model=list[AuditLogOut])
+def audit_logs(
+    limit: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_roles(UserRole.super_admin)),
+):
+    """Return recent audit logs for privileged account activity views."""
+    return db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
 
 
 @router.get("/moderation-queue", response_model=list[ListingOut])
