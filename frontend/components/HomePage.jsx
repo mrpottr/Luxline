@@ -3,21 +3,36 @@ import './HomePage.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
-const NAV_LINKS = [
-  { path: '/', label: 'Home' },
-  { path: '/listings', label: 'Listings' },
-  { path: '/agencies', label: 'Agencies' },
-  { path: '/journal', label: 'Journal' },
-  { path: '/concierge', label: 'Concierge' }
+const MARKET_NAV_LINKS = [
+  { label: 'Real Estate', category: 'real_estate' },
+  { label: 'Cars', category: 'car' },
+  { label: 'Watches', category: 'watch' },
+  { label: 'Yachts', category: 'yacht' },
+  { label: 'Jets', category: 'jet' },
+  { label: 'Motorcycles', search: 'motorcycles' },
+  { label: 'Helicopters', search: 'helicopters' },
+  { label: 'Jewelry', category: 'jewelry' },
+  { label: 'Collectibles', search: 'collectibles' },
+  { label: 'Rentals', category: 'rental' },
+  { label: 'Journal', path: '/journal' }
+];
+
+const AGENT_NAV_LINKS = [
+  { path: '/agencies', label: 'Find Agencies' },
+  { path: '/dashboard', label: 'Post Listing' },
+  { path: '/concierge', label: 'Concierge Desk' }
 ];
 
 const CATEGORY_OPTIONS = [
   { value: '', label: 'All Categories' },
   { value: 'real_estate', label: 'Real Estate' },
+  { value: 'car', label: 'Cars' },
   { value: 'hypercar', label: 'Hypercars' },
   { value: 'yacht', label: 'Yachts' },
   { value: 'jet', label: 'Jets' },
-  { value: 'watch', label: 'Watches' }
+  { value: 'watch', label: 'Watches' },
+  { value: 'jewelry', label: 'Jewelry' },
+  { value: 'rental', label: 'Rentals' }
 ];
 
 const FALLBACK_IMAGE_POOL = [
@@ -109,6 +124,7 @@ async function callApi(url, options = {}, token = '') {
 export default function HomePage() {
   const [route, setRoute] = useState(parseRoute(window.location.pathname));
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isNavOpen, setIsNavOpen] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const [token, setToken] = useState(localStorage.getItem('luxline_token') || '');
   const [listings, setListings] = useState([]);
@@ -148,7 +164,11 @@ export default function HomePage() {
     accountSummary: null,
     adminOverview: null,
     auditLogs: [],
-    moderationQueue: []
+    moderationQueue: [],
+    apiKeys: [],
+    ingestionJobs: [],
+    taxonomyTerms: [],
+    fraudSignals: []
   });
   const [dashboardError, setDashboardError] = useState('');
   const [accountRefreshKey, setAccountRefreshKey] = useState(0);
@@ -166,9 +186,17 @@ export default function HomePage() {
     location_city: '',
     make: '',
     model: '',
-    media_url: ''
+    media_url: '',
+    details_json: ''
   });
   const [listingCreateStatus, setListingCreateStatus] = useState('');
+  const [integrationStatus, setIntegrationStatus] = useState('');
+  const [apiKeyName, setApiKeyName] = useState('CRM feed key');
+  const [apiKeySecret, setApiKeySecret] = useState('');
+  const [ingestionSourceType, setIngestionSourceType] = useState('json');
+  const [ingestionContent, setIngestionContent] = useState('');
+  const [taxonomyType, setTaxonomyType] = useState('brand');
+  const [taxonomyName, setTaxonomyName] = useState('');
 
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -376,11 +404,23 @@ export default function HomePage() {
         let adminOverview = null;
         let auditLogs = [];
         let moderationQueue = [];
+        let apiKeys = [];
+        let ingestionJobs = [];
+        let taxonomyTerms = [];
+        let fraudSignals = [];
+        if (['business_account', 'super_admin'].includes(me.role)) {
+          [apiKeys, ingestionJobs] = await Promise.all([
+            callApi(`${API_BASE}/api-keys`, {}, token).catch(() => []),
+            callApi(`${API_BASE}/ingestion/jobs`, {}, token).catch(() => [])
+          ]);
+        }
         if (me.role === 'super_admin') {
-          [adminOverview, auditLogs, moderationQueue] = await Promise.all([
+          [adminOverview, auditLogs, moderationQueue, taxonomyTerms, fraudSignals] = await Promise.all([
             callApi(`${API_BASE}/admin/overview`, {}, token),
             callApi(`${API_BASE}/admin/audit-logs?limit=12`, {}, token),
-            callApi(`${API_BASE}/admin/moderation-queue`, {}, token)
+            callApi(`${API_BASE}/admin/moderation-queue`, {}, token),
+            callApi(`${API_BASE}/admin/taxonomy?include_inactive=true`, {}, token).catch(() => []),
+            callApi(`${API_BASE}/admin/fraud/signals`, {}, token).catch(() => [])
           ]);
         }
         if (cancelled) return;
@@ -393,7 +433,11 @@ export default function HomePage() {
           accountSummary,
           adminOverview,
           auditLogs,
-          moderationQueue
+          moderationQueue,
+          apiKeys,
+          ingestionJobs,
+          taxonomyTerms,
+          fraudSignals
         });
         setDashboardError('');
       } catch (err) {
@@ -410,7 +454,11 @@ export default function HomePage() {
             accountSummary: null,
             adminOverview: null,
             auditLogs: [],
-            moderationQueue: []
+            moderationQueue: [],
+            apiKeys: [],
+            ingestionJobs: [],
+            taxonomyTerms: [],
+            fraudSignals: []
           });
           setDashboardError('Session expired. Please sign in again.');
           return;
@@ -425,6 +473,7 @@ export default function HomePage() {
   }, [route.page, token, accountRefreshKey]);
 
   function navigate(path) {
+    setIsNavOpen(false);
     if (window.location.pathname === path) return;
     window.history.pushState({}, '', path);
     setRoute(parseRoute(path));
@@ -437,11 +486,24 @@ export default function HomePage() {
     navigate(path);
   }
 
+  function onMarketNavClick(event, link) {
+    event.preventDefault();
+    setIsNavOpen(false);
+    if (link.path) {
+      navigate(link.path);
+      return;
+    }
+    setCategory(link.category || '');
+    setSearch(link.search || '');
+    navigate('/listings');
+  }
+
   function submitAiAsk(event) {
     event.preventDefault();
     const q = aiQuery.trim();
     if (!q) return;
     setSearch(q);
+    setIsNavOpen(false);
     navigate('/listings');
   }
 
@@ -453,7 +515,7 @@ export default function HomePage() {
         .toLowerCase();
       const q = search.trim().toLowerCase();
       const qOk = !q || text.includes(q);
-      const cOk = !category || row.category === category;
+      const cOk = !category || row.category === category || (category === 'car' && row.category === 'hypercar');
       const listingCountry = normalizeText(row.location_country);
       const listingState = normalizeText(row.location_state || row.location_province || row.location_region);
       const continentForListing = normalizeText(
@@ -690,7 +752,11 @@ export default function HomePage() {
       accountSummary: null,
       adminOverview: null,
       auditLogs: [],
-      moderationQueue: []
+      moderationQueue: [],
+      apiKeys: [],
+      ingestionJobs: [],
+      taxonomyTerms: [],
+      fraudSignals: []
     });
     setAccountActionStatus('');
     navigate('/');
@@ -794,10 +860,66 @@ export default function HomePage() {
     }
   }
 
+  async function createApiKey(event) {
+    event.preventDefault();
+    setIntegrationStatus('Creating API key...');
+    setApiKeySecret('');
+    try {
+      const data = await callApi(`${API_BASE}/api-keys`, {
+        method: 'POST',
+        body: JSON.stringify({ name: apiKeyName || 'CRM feed key' })
+      }, token);
+      setApiKeySecret(data.secret_key || '');
+      setIntegrationStatus('API key created. Copy the secret now; it is shown once.');
+      setAccountRefreshKey((count) => count + 1);
+    } catch (err) {
+      setIntegrationStatus(err.message);
+    }
+  }
+
+  async function queueIngestionJob(event) {
+    event.preventDefault();
+    setIntegrationStatus('Queueing ingestion job...');
+    try {
+      await callApi(`${API_BASE}/ingestion/jobs`, {
+        method: 'POST',
+        body: JSON.stringify({
+          source_type: ingestionSourceType,
+          content: ingestionContent || null
+        })
+      }, token);
+      setIntegrationStatus('Ingestion job queued for staging.');
+      setIngestionContent('');
+      setAccountRefreshKey((count) => count + 1);
+    } catch (err) {
+      setIntegrationStatus(err.message);
+    }
+  }
+
+  async function createTaxonomyTerm(event) {
+    event.preventDefault();
+    setIntegrationStatus('Creating taxonomy term...');
+    try {
+      await callApi(`${API_BASE}/admin/taxonomy`, {
+        method: 'POST',
+        body: JSON.stringify({
+          taxonomy: taxonomyType,
+          name: taxonomyName
+        })
+      }, token);
+      setIntegrationStatus('Taxonomy term created.');
+      setTaxonomyName('');
+      setAccountRefreshKey((count) => count + 1);
+    } catch (err) {
+      setIntegrationStatus(err.message);
+    }
+  }
+
   async function createListing(event) {
     event.preventDefault();
     setListingCreateStatus('Publishing advertisement...');
     try {
+      const parsedDetails = listingForm.details_json.trim() ? JSON.parse(listingForm.details_json) : {};
       const payload = {
         title: listingForm.title,
         description: listingForm.description || null,
@@ -809,6 +931,7 @@ export default function HomePage() {
         location_city: listingForm.location_city || null,
         make: listingForm.make || null,
         model: listingForm.model || null,
+        details: parsedDetails,
         media_items: listingForm.media_url
           ? [{ media_type: 'image', url: listingForm.media_url, sort_order: 0 }]
           : []
@@ -831,7 +954,8 @@ export default function HomePage() {
         location_city: '',
         make: '',
         model: '',
-        media_url: ''
+        media_url: '',
+        details_json: ''
       });
     } catch (err) {
       setListingCreateStatus(err.message);
@@ -1361,7 +1485,10 @@ export default function HomePage() {
       );
     }
 
-    const canPostListings = ['private_seller', 'business_account'].includes(dashboardData.me?.role || '');
+    const currentRole = dashboardData.me?.role || '';
+    const canPostListings = ['private_seller', 'business_account'].includes(currentRole);
+    const canUseBrokerTools = ['business_account', 'super_admin'].includes(currentRole);
+    const isDashboardAdmin = currentRole === 'super_admin';
     const userListings = listings.filter((row) => row.seller_id === dashboardData.me?.id);
     const activeListings = userListings.filter((row) => row.status === 'active');
     const pendingListings = userListings.filter((row) => row.moderation_status === 'pending');
@@ -1489,6 +1616,114 @@ export default function HomePage() {
             <p>{dashboardData.alerts.length} alert channels configured</p>
           </article>
         </div>
+        {canUseBrokerTools ? (
+          <div className="account-workspace-grid">
+            <article className="panel account-card">
+              <p className="type">Broker API</p>
+              <h3>API Keys</h3>
+              <form className="inline-account-form" onSubmit={createApiKey}>
+                <input
+                  placeholder="Key name"
+                  value={apiKeyName}
+                  onChange={(e) => setApiKeyName(e.target.value)}
+                />
+                <button className="btn-solid" type="submit">Create Key</button>
+              </form>
+              {apiKeySecret ? <p className="status">{apiKeySecret}</p> : null}
+              <div className="account-stack">
+                {(dashboardData.apiKeys || []).length ? dashboardData.apiKeys.slice(0, 4).map((item) => (
+                  <div key={item.id} className="account-row">
+                    <div>
+                      <strong>{item.name}</strong>
+                      <p>{(item.scopes || []).join(', ') || 'No scopes'}</p>
+                    </div>
+                    <span>{item.revoked_at ? 'Revoked' : 'Active'}</span>
+                  </div>
+                )) : <p>No API keys yet.</p>}
+              </div>
+            </article>
+            <article className="panel account-card">
+              <p className="type">CRM Integration</p>
+              <h3>Bulk Feed Staging</h3>
+              <form className="account-stack" onSubmit={queueIngestionJob}>
+                <select value={ingestionSourceType} onChange={(e) => setIngestionSourceType(e.target.value)}>
+                  <option value="json">JSON</option>
+                  <option value="xml">XML</option>
+                  <option value="csv">CSV</option>
+                </select>
+                <textarea
+                  rows={5}
+                  placeholder="Paste feed payload for staging"
+                  value={ingestionContent}
+                  onChange={(e) => setIngestionContent(e.target.value)}
+                />
+                <button className="btn-solid" type="submit">Queue Job</button>
+              </form>
+              <div className="account-stack">
+                {(dashboardData.ingestionJobs || []).length ? dashboardData.ingestionJobs.slice(0, 4).map((job) => (
+                  <div key={job.id} className="account-row">
+                    <div>
+                      <strong>Job #{job.id}</strong>
+                      <p>{job.source_type.toUpperCase()} · {job.total_rows} staged rows</p>
+                    </div>
+                    <span>{job.status}</span>
+                  </div>
+                )) : <p>No ingestion jobs yet.</p>}
+              </div>
+            </article>
+          </div>
+        ) : null}
+        {isDashboardAdmin ? (
+          <div className="account-workspace-grid">
+            <article className="panel account-card">
+              <p className="type">Taxonomy</p>
+              <h3>Brands, Models, Builders</h3>
+              <form className="inline-account-form" onSubmit={createTaxonomyTerm}>
+                <select value={taxonomyType} onChange={(e) => setTaxonomyType(e.target.value)}>
+                  <option value="brand">Brand</option>
+                  <option value="model">Model</option>
+                  <option value="builder">Builder</option>
+                  <option value="material">Material</option>
+                  <option value="movement">Movement</option>
+                </select>
+                <input
+                  required
+                  placeholder="Term name"
+                  value={taxonomyName}
+                  onChange={(e) => setTaxonomyName(e.target.value)}
+                />
+                <button className="btn-solid" type="submit">Add</button>
+              </form>
+              <div className="account-stack">
+                {(dashboardData.taxonomyTerms || []).length ? dashboardData.taxonomyTerms.slice(0, 5).map((term) => (
+                  <div key={term.id} className="account-row">
+                    <div>
+                      <strong>{term.name}</strong>
+                      <p>{term.taxonomy}</p>
+                    </div>
+                    <span>{term.is_active ? 'Active' : 'Inactive'}</span>
+                  </div>
+                )) : <p>No taxonomy terms yet.</p>}
+              </div>
+            </article>
+            <article className="panel account-card">
+              <p className="type">Fraud Review</p>
+              <h3>Open Signals</h3>
+              <div className="account-stack">
+                {(dashboardData.fraudSignals || []).length ? dashboardData.fraudSignals.slice(0, 5).map((signal) => (
+                  <div key={signal.id} className="account-row">
+                    <div>
+                      <strong>{signal.signal_type}</strong>
+                      <p>{JSON.stringify(signal.details || {})}</p>
+                    </div>
+                    <span>{signal.severity}</span>
+                  </div>
+                )) : <p>No open fraud signals.</p>}
+              </div>
+            </article>
+          </div>
+        ) : null}
+        {integrationStatus ? <p className="status">{integrationStatus}</p> : null}
         {canPostListings ? (
           <form className="panel form post-ad-panel" onSubmit={createListing}>
             <h3>Post Advertisement</h3>
@@ -1507,10 +1742,13 @@ export default function HomePage() {
             <div className="form-row">
               <select value={listingForm.category} onChange={(e) => setListingForm((prev) => ({ ...prev, category: e.target.value }))}>
                 <option value="real_estate">Real Estate</option>
+                <option value="car">Cars</option>
                 <option value="hypercar">Hypercars</option>
                 <option value="yacht">Yachts</option>
                 <option value="jet">Jets</option>
                 <option value="watch">Watches</option>
+                <option value="jewelry">Jewelry</option>
+                <option value="rental">Rentals</option>
               </select>
               <select value={listingForm.status} onChange={(e) => setListingForm((prev) => ({ ...prev, status: e.target.value }))}>
                 <option value="draft">Draft</option>
@@ -1560,6 +1798,12 @@ export default function HomePage() {
               placeholder="Primary image URL"
               value={listingForm.media_url}
               onChange={(e) => setListingForm((prev) => ({ ...prev, media_url: e.target.value }))}
+            />
+            <textarea
+              rows={4}
+              placeholder='Details JSON, e.g. {"bedrooms":4,"area_value":5200,"area_unit":"sqft"}'
+              value={listingForm.details_json}
+              onChange={(e) => setListingForm((prev) => ({ ...prev, details_json: e.target.value }))}
             />
             <button className="btn-solid" type="submit">Post Ad</button>
             {listingCreateStatus ? <p className="status">{listingCreateStatus}</p> : null}
@@ -1891,21 +2135,70 @@ export default function HomePage() {
       { path: '/account', label: 'My Account' },
       { path: '/admin', label: 'Admin' }
     ]
-    : [{ path: '/dashboard', label: 'Login / Register' }];
+    : [{ path: '/dashboard', label: 'Log In or Sign Up' }];
 
   return (
     <div className="lux-shell">
-      <header className={`top-nav ${isScrolled ? 'scrolled' : ''}`}>
+      <header className={`top-nav james-edition-nav ${isScrolled ? 'scrolled' : ''}`}>
         <div className="top-nav-main">
-          <a href="/" className="brand" onClick={(e) => onNavClick(e, '/')}>Luxline</a>
-          <nav className="nav-ribbon">
-            {[...NAV_LINKS, ...authNavLinks].map((link) => (
-              <a key={link.path} href={link.path} onClick={(e) => onNavClick(e, link.path)} className={route.page === (link.path === '/' ? 'home' : link.path.slice(1)) ? 'active' : ''}>
+          <div className="nav-left">
+            <button
+              className={`menu-trigger ${isNavOpen ? 'active' : ''}`}
+              type="button"
+              aria-label="Open navigation"
+              aria-expanded={isNavOpen}
+              onClick={() => setIsNavOpen((value) => !value)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+            <a href="/" className="brand" onClick={(e) => onNavClick(e, '/')}>Luxline</a>
+          </div>
+
+          <div className="nav-utility">
+            <a href="/dashboard" onClick={(e) => onNavClick(e, '/dashboard')}>Sell With Us</a>
+            <div className="agent-menu">
+              <button type="button">For Agents</button>
+              <div className="agent-menu-panel">
+                {AGENT_NAV_LINKS.map((link) => (
+                  <a key={link.path} href={link.path} onClick={(e) => onNavClick(e, link.path)}>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+            {authNavLinks.map((link) => (
+              <a
+                key={link.path}
+                href={link.path}
+                onClick={(e) => onNavClick(e, link.path)}
+                className={`login-link ${route.page === link.path.slice(1) ? 'active' : ''}`}
+              >
                 {link.label}
               </a>
             ))}
-          </nav>
+          </div>
         </div>
+
+        <nav className="nav-ribbon" aria-label="Marketplace categories">
+          {MARKET_NAV_LINKS.map((link) => {
+            const isActive = link.path
+              ? route.page === link.path.slice(1)
+              : route.page === 'listings' && ((link.category && category === link.category) || (link.search && search === link.search));
+            return (
+              <a
+                key={link.label}
+                href={link.path || '/listings'}
+                onClick={(e) => onMarketNavClick(e, link)}
+                className={isActive ? 'active' : ''}
+              >
+                {link.label}
+              </a>
+            );
+          })}
+        </nav>
+
         <div className="ai-ask-ribbon">
           <form className="ai-ask-inline" onSubmit={submitAiAsk}>
             <input
@@ -1917,6 +2210,25 @@ export default function HomePage() {
             />
             <button type="submit">Ask</button>
           </form>
+        </div>
+
+        <div className={`mobile-nav-panel ${isNavOpen ? 'open' : ''}`}>
+          <nav aria-label="Mobile marketplace categories">
+            {MARKET_NAV_LINKS.map((link) => (
+              <a key={link.label} href={link.path || '/listings'} onClick={(e) => onMarketNavClick(e, link)}>
+                {link.label}
+              </a>
+            ))}
+          </nav>
+          <div className="mobile-nav-actions">
+            <a href="/dashboard" onClick={(e) => onNavClick(e, '/dashboard')}>Sell With Us</a>
+            <a href="/agencies" onClick={(e) => onNavClick(e, '/agencies')}>For Agents</a>
+            {authNavLinks.map((link) => (
+              <a key={link.path} href={link.path} onClick={(e) => onNavClick(e, link.path)}>
+                {link.label}
+              </a>
+            ))}
+          </div>
         </div>
       </header>
 

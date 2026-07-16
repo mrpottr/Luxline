@@ -180,6 +180,7 @@ class ListingCreate(BaseModel):
     draft_depth: float | None = None
     beam_width: float | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
+    details: dict[str, Any] = Field(default_factory=dict)
     media_items: list[ListingMediaIn] = Field(default_factory=list)
 
 
@@ -191,6 +192,7 @@ class ListingUpdate(BaseModel):
     price: float | None = Field(default=None, gt=0)
     currency: str | None = None
     attributes: dict[str, Any] | None = None
+    details: dict[str, Any] | None = None
 
 
 class ListingOut(BaseModel):
@@ -223,6 +225,7 @@ class ListingOut(BaseModel):
     draft_depth: float | None
     beam_width: float | None
     attributes: dict[str, Any]
+    details: dict[str, Any] = Field(default_factory=dict)
     is_featured: bool
     published_at: datetime | None
     created_at: datetime
@@ -240,6 +243,7 @@ class ListingImportItem(BaseModel):
     make: str | None = None
     model: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class ListingImportRequest(BaseModel):
@@ -370,6 +374,137 @@ class BlogPostOut(BaseModel):
     podcast_embed_url: str | None
     published: bool
     created_at: datetime
+
+
+class TaxonomyTermCreate(BaseModel):
+    taxonomy: str
+    name: str
+    parent_id: int | None = None
+    slug: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class TaxonomyTermUpdate(BaseModel):
+    name: str | None = None
+    parent_id: int | None = None
+    slug: str | None = None
+    metadata_json: dict[str, Any] | None = None
+    is_active: bool | None = None
+
+
+class TaxonomyTermOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    taxonomy: str
+    parent_id: int | None
+    name: str
+    slug: str
+    metadata_json: dict[str, Any]
+    is_active: bool
+    created_at: datetime
+
+
+class ApiKeyCreate(BaseModel):
+    name: str
+    scopes: list[str] = Field(default_factory=lambda: ["listings:write", "feeds:write", "leads:read"])
+
+
+class ApiKeyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    owner_user_id: int
+    name: str
+    scopes: list[str]
+    last_used_at: datetime | None
+    revoked_at: datetime | None
+    created_at: datetime
+
+
+class ApiKeyCreateResponse(ApiKeyOut):
+    secret_key: str
+
+
+class BrokerFeedCreate(BaseModel):
+    name: str
+    source_type: str = Field(description="json|xml|csv|url")
+    pull_url: str | None = None
+    mapping_json: dict[str, Any] = Field(default_factory=dict)
+    schedule_cron: str | None = None
+
+
+class BrokerFeedOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    owner_user_id: int
+    name: str
+    source_type: str
+    pull_url: str | None
+    mapping_json: dict[str, Any]
+    schedule_cron: str | None
+    status: str
+    created_at: datetime
+
+
+class IngestionJobCreate(BaseModel):
+    source_type: str = Field(description="json|xml|csv|url")
+    feed_id: int | None = None
+    content: str | None = None
+    source_url: str | None = None
+
+
+class IngestionJobOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    owner_user_id: int
+    feed_id: int | None
+    source_type: str
+    status: str
+    total_rows: int
+    success_rows: int
+    failed_rows: int
+    error_json: dict[str, Any]
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class IngestionRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    job_id: int
+    external_id: str | None
+    row_payload: dict[str, Any]
+    status: str
+    error_json: dict[str, Any]
+    created_at: datetime
+
+
+class FraudSignalCreate(BaseModel):
+    listing_id: int | None = None
+    user_id: int | None = None
+    signal_type: str
+    severity: str = "medium"
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class FraudSignalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    listing_id: int | None
+    user_id: int | None
+    signal_type: str
+    severity: str
+    status: str
+    details: dict[str, Any]
+    created_at: datetime
+    resolved_at: datetime | None
 
 
 class AuditLogOut(BaseModel):

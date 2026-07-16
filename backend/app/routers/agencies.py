@@ -17,6 +17,12 @@ from backend.app.schemas import (
 router = APIRouter(prefix="/agencies", tags=["agencies"])
 
 
+@router.get("", response_model=list[AgencyProfileOut])
+def list_agencies(db: Session = Depends(get_db)):
+    """Return all public agency profiles."""
+    return db.query(AgencyProfile).order_by(AgencyProfile.id.asc()).limit(100).all()
+
+
 @router.post("/me/profile", response_model=AgencyProfileOut, status_code=status.HTTP_201_CREATED)
 def create_or_update_profile(
     payload: AgencyProfileUpsert,

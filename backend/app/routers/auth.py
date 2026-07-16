@@ -17,6 +17,7 @@ from backend.app.core.security import (
     verify_password,
 )
 from backend.app.db.session import get_db
+from backend.app.dependencies import get_current_user as get_current_user_dep
 from backend.app.models import EmailVerificationChallenge, SocialAccount, TwoFactorChallenge, User, UserRole
 from backend.app.schemas import (
     EmailVerificationRequest,
@@ -249,3 +250,22 @@ def social_login(payload: SocialLoginRequest, db: Session = Depends(get_db)):
     db.refresh(user)
     token = create_access_token(str(user.id), extra_claims={"role": user.role.value})
     return TokenResponse(access_token=token)
+
+
+@router.get("/me", response_model=UserOut)
+def get_authenticated_user(current_user: User = Depends(get_current_user_dep)):
+    """Return the authenticated user's own profile – convenience alias for /users/me."""
+    return current_user
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_token(current_user: User = Depends(get_current_user_dep)):
+    """Issue a fresh JWT for an already-authenticated user (slide the expiry window)."""
+    token = create_access_token(str(current_user.id), extra_claims={"role": current_user.role.value})
+    return TokenResponse(access_token=token)
+
+
+@router.post("/logout")
+def logout(_current_user: User = Depends(get_current_user_dep)):
+    """Invalidate the current session. JWTs are stateless; clients must discard the token."""
+    return {"message": "Logged out successfully"}

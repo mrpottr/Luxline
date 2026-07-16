@@ -30,10 +30,13 @@ class UserRole(str, Enum):
 
 class ListingCategory(str, Enum):
     real_estate = "real_estate"
+    car = "car"
     hypercar = "hypercar"
     yacht = "yacht"
     jet = "jet"
     watch = "watch"
+    jewelry = "jewelry"
+    rental = "rental"
 
 
 class ListingStatus(str, Enum):
@@ -174,6 +177,182 @@ class Listing(Base):
     seller: Mapped["User"] = relationship(back_populates="listings")
     media_items: Mapped[list["ListingMedia"]] = relationship(back_populates="listing")
     inquiries: Mapped[list["Inquiry"]] = relationship(back_populates="listing")
+    real_estate_details: Mapped["RealEstateListing | None"] = relationship(
+        back_populates="listing", uselist=False, cascade="all, delete-orphan"
+    )
+    vehicle_details: Mapped["VehicleListing | None"] = relationship(
+        back_populates="listing", uselist=False, cascade="all, delete-orphan"
+    )
+    vessel_aircraft_details: Mapped["VesselAircraftListing | None"] = relationship(
+        back_populates="listing", uselist=False, cascade="all, delete-orphan"
+    )
+    watch_jewelry_details: Mapped["WatchJewelryListing | None"] = relationship(
+        back_populates="listing", uselist=False, cascade="all, delete-orphan"
+    )
+    rental_terms: Mapped["RentalTerms | None"] = relationship(
+        back_populates="listing", uselist=False, cascade="all, delete-orphan"
+    )
+
+    @property
+    def details(self) -> dict:
+        """Return category-specific fields from additive subtype tables."""
+        if self.real_estate_details:
+            return self.real_estate_details.as_dict()
+        if self.vehicle_details:
+            return self.vehicle_details.as_dict()
+        if self.vessel_aircraft_details:
+            return self.vessel_aircraft_details.as_dict()
+        if self.watch_jewelry_details:
+            return self.watch_jewelry_details.as_dict()
+        if self.rental_terms:
+            return self.rental_terms.as_dict()
+        return self.attributes or {}
+
+
+class TaxonomyTerm(Base):
+    __tablename__ = "taxonomy_terms"
+    __table_args__ = (UniqueConstraint("taxonomy", "parent_id", "slug", name="uq_taxonomy_parent_slug"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    taxonomy: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    slug: Mapped[str] = mapped_column(String(180), nullable=False)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+
+class RealEstateListing(Base):
+    __tablename__ = "listing_real_estate"
+
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
+    area_value: Mapped[float | None] = mapped_column(Float)
+    area_unit: Mapped[str | None] = mapped_column(String(8))
+    acreage: Mapped[float | None] = mapped_column(Float)
+    bedrooms: Mapped[int | None] = mapped_column(Integer)
+    bathrooms: Mapped[float | None] = mapped_column(Float)
+    property_type_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True)
+
+    listing: Mapped["Listing"] = relationship(back_populates="real_estate_details")
+
+    def as_dict(self) -> dict:
+        return {
+            "area_value": self.area_value,
+            "area_unit": self.area_unit,
+            "acreage": self.acreage,
+            "bedrooms": self.bedrooms,
+            "bathrooms": self.bathrooms,
+            "property_type_id": self.property_type_id,
+        }
+
+
+class VehicleListing(Base):
+    __tablename__ = "listing_vehicle"
+
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
+    make_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
+    make: Mapped[str | None] = mapped_column(String(120), index=True)
+    model: Mapped[str | None] = mapped_column(String(120), index=True)
+    year: Mapped[int | None] = mapped_column(Integer, index=True)
+    mileage_value: Mapped[float | None] = mapped_column(Float)
+    mileage_unit: Mapped[str | None] = mapped_column(String(8))
+    vin_ciphertext: Mapped[str | None] = mapped_column(Text)
+    steering_side: Mapped[str | None] = mapped_column(String(8))
+
+    listing: Mapped["Listing"] = relationship(back_populates="vehicle_details")
+
+    def as_dict(self) -> dict:
+        return {
+            "make_id": self.make_id,
+            "model_id": self.model_id,
+            "make": self.make,
+            "model": self.model,
+            "year": self.year,
+            "mileage_value": self.mileage_value,
+            "mileage_unit": self.mileage_unit,
+            "steering_side": self.steering_side,
+        }
+
+
+class VesselAircraftListing(Base):
+    __tablename__ = "listing_vessel_aircraft"
+
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
+    asset_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    builder_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
+    builder: Mapped[str | None] = mapped_column(String(120), index=True)
+    year: Mapped[int | None] = mapped_column(Integer, index=True)
+    length_value: Mapped[float | None] = mapped_column(Float)
+    length_unit: Mapped[str | None] = mapped_column(String(8))
+    cabins: Mapped[int | None] = mapped_column(Integer)
+    engine_hours: Mapped[int | None] = mapped_column(Integer)
+
+    listing: Mapped["Listing"] = relationship(back_populates="vessel_aircraft_details")
+
+    def as_dict(self) -> dict:
+        return {
+            "asset_type": self.asset_type,
+            "builder_id": self.builder_id,
+            "builder": self.builder,
+            "year": self.year,
+            "length_value": self.length_value,
+            "length_unit": self.length_unit,
+            "cabins": self.cabins,
+            "engine_hours": self.engine_hours,
+        }
+
+
+class WatchJewelryListing(Base):
+    __tablename__ = "listing_watch_jewelry"
+
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
+    asset_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
+    brand: Mapped[str | None] = mapped_column(String(120), index=True)
+    reference_number: Mapped[str | None] = mapped_column(String(120), index=True)
+    case_material_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True)
+    movement_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True)
+    case_material: Mapped[str | None] = mapped_column(String(120))
+    movement: Mapped[str | None] = mapped_column(String(120))
+
+    listing: Mapped["Listing"] = relationship(back_populates="watch_jewelry_details")
+
+    def as_dict(self) -> dict:
+        return {
+            "asset_type": self.asset_type,
+            "brand_id": self.brand_id,
+            "brand": self.brand,
+            "reference_number": self.reference_number,
+            "case_material_id": self.case_material_id,
+            "movement_id": self.movement_id,
+            "case_material": self.case_material,
+            "movement": self.movement,
+        }
+
+
+class RentalTerms(Base):
+    __tablename__ = "listing_rental_terms"
+
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
+    available_from: Mapped[datetime | None] = mapped_column(DateTime)
+    available_until: Mapped[datetime | None] = mapped_column(DateTime)
+    min_nights: Mapped[int | None] = mapped_column(Integer)
+    pricing_tiers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+
+    listing: Mapped["Listing"] = relationship(back_populates="rental_terms")
+
+    def as_dict(self) -> dict:
+        return {
+            "available_from": self.available_from,
+            "available_until": self.available_until,
+            "min_nights": self.min_nights,
+            "pricing_tiers": self.pricing_tiers,
+        }
 
 
 class ListingMedia(Base):
@@ -306,6 +485,105 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     actor: Mapped["User | None"] = relationship(back_populates="audit_logs")
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class BrokerFeed(Base):
+    __tablename__ = "broker_feeds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    pull_url: Mapped[str | None] = mapped_column(String(600))
+    mapping_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    schedule_cron: Mapped[str | None] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(24), default="active", nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+
+class IngestionJob(Base):
+    __tablename__ = "ingestion_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    feed_id: Mapped[int | None] = mapped_column(ForeignKey("broker_feeds.id"), nullable=True, index=True)
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="queued", nullable=False, index=True)
+    total_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    success_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class IngestionRow(Base):
+    __tablename__ = "ingestion_rows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("ingestion_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    external_id: Mapped[str | None] = mapped_column(String(160), index=True)
+    row_payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="staged", nullable=False, index=True)
+    error_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ListingExternalId(Base):
+    __tablename__ = "listing_external_ids"
+    __table_args__ = (
+        UniqueConstraint("owner_user_id", "source", "external_id", name="uq_listing_external_owner_source_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(80), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class OutboxEvent(Base):
+    __tablename__ = "outbox_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    aggregate_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    aggregate_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class FraudSignal(Base):
+    __tablename__ = "fraud_signals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"), nullable=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    signal_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    severity: Mapped[str] = mapped_column(String(20), default="medium", nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(24), default="open", nullable=False, index=True)
+    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class SocialAccount(Base):

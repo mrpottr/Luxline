@@ -13,6 +13,20 @@ from backend.app.schemas import BlogPostCreate, BlogPostOut, SubscriptionCreate,
 
 router = APIRouter(prefix="/monetization", tags=["monetization"])
 
+# --- Subscription plans (static catalog) ---
+PLANS = [
+    {"code": "starter", "name": "Starter", "price_usd": 99, "listing_limit": 5, "featured_slots": 0, "description": "For private sellers listing up to 5 assets."},
+    {"code": "professional", "name": "Professional", "price_usd": 299, "listing_limit": 25, "featured_slots": 3, "description": "For boutique brokers and agencies."},
+    {"code": "elite", "name": "Elite", "price_usd": 799, "listing_limit": 100, "featured_slots": 10, "description": "For large brokerages with full catalogue access."},
+    {"code": "enterprise", "name": "Enterprise", "price_usd": 0, "listing_limit": None, "featured_slots": None, "description": "Custom arrangement. Contact us."},
+]
+
+
+@router.get("/plans")
+def list_plans():
+    """Return available subscription plan options."""
+    return PLANS
+
 
 @router.post("/subscriptions", response_model=SubscriptionOut, status_code=status.HTTP_201_CREATED)
 def create_subscription(

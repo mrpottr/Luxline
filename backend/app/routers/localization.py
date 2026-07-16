@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query
 
-from backend.app.services.currency import FALLBACK_RATES, convert_currency
+from backend.app.services.localization.currency import LocalizationService
 
 
 router = APIRouter(prefix="/localization", tags=["localization"])
@@ -14,14 +14,13 @@ MEASUREMENT_SYSTEMS = ["imperial", "metric"]
 
 @router.get("/currencies")
 def currencies():
-    """Return the base currency and supported fallback exchange rates."""
-    return {"base": "USD", "rates": FALLBACK_RATES}
+    return {"base": "USD", "rates": LocalizationService._rates_cache}
 
 
 @router.get("/convert")
 def convert(amount: float, from_code: str = Query(alias="from"), to_code: str = Query(alias="to")):
     """Convert an amount between two supported currencies."""
-    converted = convert_currency(amount, from_code, to_code)
+    converted = LocalizationService.convert_currency(amount, from_code, to_code)
     return {"amount": amount, "from": from_code.upper(), "to": to_code.upper(), "converted": converted}
 
 

@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package luxline.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum ListingCategory {
+  LISTING_CATEGORY_UNSPECIFIED = 0;
+  REAL_ESTATE = 1;
+  CAR = 2;
+  YACHT = 3;
+  JET = 4;
+  WATCH = 5;
+  JEWELRY = 6;
+  RENTAL = 7;
+}
+
+message Money {
+  string currency = 1;
+  int64 amount_minor = 2;
+}
+
+message ListingSummary {
+  int64 id = 1;
+  string public_id = 2;
+  ListingCategory category = 3;
+  string title = 4;
+  Money price = 5;
+  string seller_id = 6;
+  string status = 7;
+  string moderation_status = 8;
+  google.protobuf.Timestamp published_at = 9;
+}
+
+message GetListingRequest {
+  int64 listing_id = 1;
+  bool include_private = 2;
+}
+
+message ListingChangedEvent {
+  int64 listing_id = 1;
+  string change_type = 2;
+  google.protobuf.Timestamp changed_at = 3;
+}
+
+service InventoryService {
+  rpc GetListing(GetListingRequest) returns (ListingSummary);
+  rpc StreamListingChanges(google.protobuf.Timestamp) returns (stream ListingChangedEvent);
+}
+
+message CreateLeadRequest {
+  int64 listing_id = 1;
+  string buyer_user_id = 2;
+  string buyer_name = 3;
+  string buyer_email = 4;
+  string buyer_phone = 5;
+  string message = 6;
+  string source = 7;
+}
+
+message CreateLeadResponse {
+  int64 lead_id = 1;
+  string status = 2;
+  string routed_to_seller_id = 3;
+}
+
+message LeadStatusChanged {
+  int64 lead_id = 1;
+  string status = 2;
+  string pipeline_stage = 3;
+  google.protobuf.Timestamp changed_at = 4;
+}
+
+service LeadGenerationService {
+  rpc CreateLead(CreateLeadRequest) returns (CreateLeadResponse);
+  rpc StreamLeadUpdates(google.protobuf.Timestamp) returns (stream LeadStatusChanged);
+}
+
+message SearchRequest {
+  string query = 1;
+  ListingCategory category = 2;
+  int64 min_price_usd_minor = 3;
+  int64 max_price_usd_minor = 4;
+  map<string, string> facets = 5;
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message FacetBucket {
+  string field = 1;
+  string value = 2;
+  int64 count = 3;
+}
+
+message SearchResponse {
+  repeated ListingSummary results = 1;
+  repeated FacetBucket facets = 2;
+  int64 total = 3;
+}
+
+service SearchService {
+  rpc SearchListings(SearchRequest) returns (SearchResponse);
+  rpc ReindexListing(GetListingRequest) returns (ListingSummary);
+}
+
+message ConvertMoneyRequest {
+  Money amount = 1;
+  string target_currency = 2;
+}
+
+service LocalizationService {
+  rpc ConvertMoney(ConvertMoneyRequest) returns (Money);
+}

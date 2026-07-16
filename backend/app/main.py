@@ -9,9 +9,33 @@ import time
 from backend.app.core.config import settings
 from backend.app.db.base import Base
 from backend.app.db.bootstrap import ensure_default_admin
-from backend.app.db.schema import ensure_schema_compatibility
+from backend.app.db.schema import backfill_listing_subtype_rows, ensure_schema_compatibility
 from backend.app.db.session import SessionLocal, engine
-from backend.app.routers import admin, agencies, auth, health, leads, listings, localization, monetization, search, users
+from backend.app.routers import (
+    admin,
+    admin_cms,
+    admin_fraud,
+    admin_moderation,
+    admin_taxonomy,
+    agencies,
+    api_keys,
+    auth,
+    health,
+    ingestion,
+    journal,
+    leads,
+    listings,
+    listings_collectibles,
+    listings_marine_aviation,
+    listings_motors,
+    listings_real_estate,
+    localization,
+    messaging,
+    monetization,
+    rentals,
+    search,
+    users,
+)
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -97,26 +121,40 @@ def create_app() -> FastAPI:
 
     ensure_schema_compatibility(engine)
     Base.metadata.create_all(bind=engine)
+    backfill_listing_subtype_rows(engine)
     with SessionLocal() as db:
         ensure_default_admin(db)
 
-    app.include_router(health.router)
+    api_prefix = "/api/v1"
+    app.include_router(health.router, prefix=api_prefix)
     
     @app.get("/metrics", tags=["monitoring"])
     async def metrics_endpoint():
         """Prometheus metrics endpoint."""
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-    api_prefix = "/api/v1"
     app.include_router(auth.router, prefix=api_prefix)
     app.include_router(users.router, prefix=api_prefix)
     app.include_router(agencies.router, prefix=api_prefix)
     app.include_router(listings.router, prefix=api_prefix)
+    app.include_router(listings_real_estate.router, prefix=api_prefix)
+    app.include_router(listings_motors.router, prefix=api_prefix)
+    app.include_router(listings_marine_aviation.router, prefix=api_prefix)
+    app.include_router(listings_collectibles.router, prefix=api_prefix)
+    app.include_router(rentals.router, prefix=api_prefix)
     app.include_router(search.router, prefix=api_prefix)
     app.include_router(leads.router, prefix=api_prefix)
+    app.include_router(messaging.router, prefix=api_prefix)
+    app.include_router(api_keys.router, prefix=api_prefix)
+    app.include_router(ingestion.router, prefix=api_prefix)
     app.include_router(monetization.router, prefix=api_prefix)
+    app.include_router(journal.router, prefix=api_prefix)
     app.include_router(localization.router, prefix=api_prefix)
     app.include_router(admin.router, prefix=api_prefix)
+    app.include_router(admin_moderation.router, prefix=api_prefix)
+    app.include_router(admin_taxonomy.router, prefix=api_prefix)
+    app.include_router(admin_fraud.router, prefix=api_prefix)
+    app.include_router(admin_cms.router, prefix=api_prefix)
 
     return app
 

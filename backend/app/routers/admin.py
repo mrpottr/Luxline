@@ -14,6 +14,15 @@ from backend.app.schemas import AdminOverviewOut, AdminResetPasswordRequest, Aud
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+@router.get("/users", response_model=list[UserOut])
+def admin_list_users(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_roles(UserRole.super_admin)),
+):
+    """List all platform users for admin management."""
+    return db.query(User).order_by(User.created_at.desc()).all()
+
+
 @router.get("/overview", response_model=AdminOverviewOut)
 def admin_overview(
     db: Session = Depends(get_db),
@@ -48,53 +57,6 @@ def audit_logs(
     """Return recent audit logs for privileged account activity views."""
     return db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
 
-
-@router.get("/moderation-queue", response_model=list[ListingOut])
-def moderation_queue(
-    db: Session = Depends(get_db),
-    _admin: User = Depends(require_roles(UserRole.super_admin)),
-):
-    """Return pending listings requiring moderation review."""
-    return (
-        db.query(Listing)
-        .filter(Listing.moderation_status == ModerationStatus.pending)
-        .order_by(Listing.created_at.asc())
-        .all()
-    )
-
-
-@router.post("/listings/{listing_id}/approve", response_model=ListingOut)
-def approve_listing(
-    listing_id: int,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_roles(UserRole.super_admin)),
-):
-    """Approve a listing in moderation and record an audit event."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-    listing.moderation_status = ModerationStatus.approved
-    db.add(AuditLog(actor_user_id=admin.id, event_type="listing.approved", details={"listing_id": listing_id}))
-    db.commit()
-    db.refresh(listing)
-    return listing
-
-
-@router.post("/listings/{listing_id}/reject", response_model=ListingOut)
-def reject_listing(
-    listing_id: int,
-    db: Session = Depends(get_db),
-    admin: User = Depends(require_roles(UserRole.super_admin)),
-):
-    """Reject a listing in moderation and record an audit event."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-    listing.moderation_status = ModerationStatus.rejected
-    db.add(AuditLog(actor_user_id=admin.id, event_type="listing.rejected", details={"listing_id": listing_id}))
-    db.commit()
-    db.refresh(listing)
-    return listing
 
 
 @router.post("/users/{user_id}/verify-business", response_model=UserOut)

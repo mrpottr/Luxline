@@ -18,9 +18,15 @@ from backend.app.models import (
     ListingMedia,
     ListingStatus,
     ModerationStatus,
+    OutboxEvent,
+    RealEstateListing,
+    RentalTerms,
     SavedListing,
     User,
     UserRole,
+    VehicleListing,
+    VesselAircraftListing,
+    WatchJewelryListing,
 )
 from backend.app.schemas import (
     ListingCreate,
@@ -30,6 +36,7 @@ from backend.app.schemas import (
     ListingUpdate,
 )
 from backend.app.utils import slugify
+from backend.app.services.inventory.service import InventoryService
 
 
 router = APIRouter(prefix="/listings", tags=["listings"])
@@ -43,6 +50,18 @@ def ensure_unique_slug(db: Session, base_slug: str) -> str:
         slug = f"{base_slug}-{counter}"
         counter += 1
     return slug
+
+
+def _parse_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
 
 
 @router.post("", response_model=ListingOut, status_code=status.HTTP_201_CREATED)
@@ -94,6 +113,8 @@ def create_listing(
 
     db.add(listing)
     db.flush()
+    InventoryService.upsert_listing_details(db, listing, payload.details)
+    InventoryService.queue_listing_changed(db, listing, "created")
 
     for media in payload.media_items:
         db.add(
@@ -126,7 +147,10 @@ def list_listings(
             parsed_category = ListingCategory(category.strip().lower())
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid category")
-        conditions.append(Listing.category == parsed_category)
+        if parsed_category == ListingCategory.car:
+            conditions.append(Listing.category.in_([ListingCategory.car, ListingCategory.hypercar]))
+        else:
+            conditions.append(Listing.category == parsed_category)
     if status_filter:
         conditions.append(Listing.status == status_filter)
     if city:
@@ -178,10 +202,16 @@ def update_listing(
         raise HTTPException(status_code=403, detail="Not your listing")
 
     for key, value in payload.model_dump(exclude_unset=True).items():
+        if key == "details":
+            continue
         setattr(listing, key, value)
+
+    if payload.details is not None:
+        InventoryService.upsert_listing_details(db, listing, payload.details)
 
     if listing.status == ListingStatus.active and not listing.published_at:
         listing.published_at = datetime.utcnow()
+    InventoryService.queue_listing_changed(db, listing, "updated")
     db.commit()
     db.refresh(listing)
     return listing
@@ -238,6 +268,8 @@ def bulk_import_listings(
         )
         db.add(listing)
         db.flush()
+        InventoryService.upsert_listing_details(db, listing, item.details)
+        InventoryService.queue_listing_changed(db, listing, "imported")
         created_ids.append(listing.id)
 
     db.commit()
@@ -300,6 +332,8 @@ def import_feed(
         )
         db.add(listing)
         db.flush()
+        InventoryService.upsert_listing_details(db, listing)
+        InventoryService.queue_listing_changed(db, listing, "feed_imported")
         created_ids.append(listing.id)
 
     db.commit()
