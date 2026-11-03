@@ -13,6 +13,8 @@ import LeadsKanbanScreen from './screens/LeadsKanbanScreen';
 import InboxScreen from './screens/InboxScreen';
 import DashboardOverviewScreen from './screens/DashboardOverviewScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
+import PromotionsScreen from './screens/PromotionsScreen';
+import BillingPlansScreen from './screens/BillingPlansScreen';
 
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -39,6 +41,14 @@ function BrokerApp() {
   const [loading, setLoading] = useState(true);
   const [listingEditor, setListingEditor] = useState(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${BROKER_API_BASE}/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((context) => { if (context?.role) setRole(context.role); })
+      .catch(() => {});
+  }, [token]);
 
   // If the feature flag is disabled, show disabled notice
   if (!IS_ENABLED) {
@@ -138,13 +148,13 @@ function BrokerApp() {
           >
             🏢 Regional Branches
           </button>
-          <button
+          {(role === 'broker_owner' || role === 'broker_manager') && <button
             type="button"
             className={`broker-nav-item ${activeTab === 'promotions' ? 'active' : ''}`}
             onClick={() => setActiveTab('promotions')}
           >
             ⚡ Boost & Visibility
-          </button>
+          </button>}
           <button
             type="button"
             className={`broker-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
@@ -159,6 +169,13 @@ function BrokerApp() {
           >
             ⚙️ Organization Settings
           </button>
+          {role === 'broker_owner' && <button
+            type="button"
+            className={`broker-nav-item ${activeTab === 'billing' ? 'active' : ''}`}
+            onClick={() => setActiveTab('billing')}
+          >
+            Billing & Plans
+          </button>}
         </nav>
 
         <div className="broker-sidebar-footer">
@@ -234,6 +251,8 @@ function BrokerApp() {
           )}
           {activeTab === 'dashboard' && <DashboardOverviewScreen token={token} apiBase={BROKER_API_BASE} />}
           {activeTab === 'analytics' && <AnalyticsScreen token={token} apiBase={BROKER_API_BASE} />}
+          {activeTab === 'promotions' && (role === 'broker_owner' || role === 'broker_manager') && <PromotionsScreen token={token} apiBase={BROKER_API_BASE} />}
+          {activeTab === 'billing' && role === 'broker_owner' && <BillingPlansScreen token={token} apiBase={BROKER_API_BASE} />}
         </div>
       </main>
     </div>

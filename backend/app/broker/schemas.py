@@ -313,6 +313,107 @@ class BrokerAnalyticsOut(BaseModel):
     by_listing: list[dict[str, Any]]
     by_agent: list[dict[str, Any]]
 
+
+class BrokerPromotionCreate(BaseModel):
+    listing_id: int = Field(ge=1)
+    scope: str = Field(pattern="^(city|locality|province|country)$")
+    location_code: str = Field(min_length=1, max_length=120)
+    placement_type: str = Field(pattern="^(featured|premium|urgent)$")
+    starts_at: datetime
+    ends_at: datetime
+
+    @model_validator(mode="after")
+    def promotion_dates_must_have_timezone(self):
+        if self.starts_at.tzinfo is None or self.ends_at.tzinfo is None:
+            raise ValueError("Promotion timestamps must include a timezone")
+        if self.ends_at <= self.starts_at:
+            raise ValueError("Promotion end must be after its start")
+        return self
+
+
+class BrokerPlanUpsert(BaseModel):
+    code: str = Field(min_length=1, max_length=50, pattern="^[a-z0-9_-]+$")
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=2000)
+    price_amount: str = Field(min_length=1, max_length=32)
+    currency: str = Field(pattern="^[A-Z]{3}$")
+    billing_period_days: int = Field(ge=1)
+    listing_limit: int | None = Field(default=None, ge=1)
+    entitlements: dict[str, Any] = Field(default_factory=dict)
+    credit_packs: list[dict[str, Any]] = Field(default_factory=list)
+    promotion_prices: dict[str, dict[str, int]] = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class BrokerPlanOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: str
+    price_amount: str
+    currency: str
+    billing_period_days: int
+    listing_limit: int | None = None
+    entitlements: dict[str, Any]
+    credit_packs: list[dict[str, Any]]
+    promotion_prices: dict[str, Any]
+    is_active: bool
+    version: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerPromotionOut(BaseModel):
+    id: int
+    organization_id: int
+    listing_id: int
+    scope: str
+    location_code: str
+    placement_type: str
+    starts_at: datetime
+    ends_at: datetime
+    credits_spent: int
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerCreditLedgerOut(BaseModel):
+    id: int
+    organization_id: int
+    entry_type: str
+    amount: int
+    balance_after: int
+    actor_user_id: int | None = None
+    promotion_id: int | None = None
+    reference: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerCreditWalletOut(BaseModel):
+    balance: int
+    ledger: list[BrokerCreditLedgerOut]
+
+
+class BrokerSubscriptionOut(BaseModel):
+    id: int
+    organization_id: int
+    plan_code: str
+    status: str
+    starts_at: datetime
+    ends_at: datetime
+    plan_version: int
+    listing_limit_snapshot: int | None = None
+    entitlements_snapshot: dict[str, Any]
+    payment_reference: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class BrokerListingCreate(BaseModel):
     title: str = Field(min_length=5, max_length=255)
     description: str | None = Field(default=None, max_length=20000)

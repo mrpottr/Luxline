@@ -67,3 +67,27 @@ Analytics routes require the feature flag, bearer authentication, selected organ
 | GET | `/analytics/export.csv` | Export a paginated listing or agent breakdown with `date_from`, `date_to`, `dimension`, `limit` (1–500), and `offset`. |
 
 Qualified conversion means qualified or closed leads divided by all leads created in the requested period. Click-through rate is detail views divided by visible listing impressions and is null when no impressions exist. Impressions are counted once per listing per browser session after at least 50% visibility. Response-time and agent attribution follow the lead’s current assignment; listing engagement follows its current assigned agent. Existing marketplace endpoint contracts remain unchanged.
+---
+
+## Plans, billing, credits, and promotions
+
+These routes require the backend feature flag, bearer authentication, an active organization membership, and an approved broker profile. Broker plan, wallet, subscription, and promotion records use new `broker_` collections. Application use cases check each permission; tenant repository methods include `organization_id`. Plan settings are global and writable only by a platform `super_admin`. Configure plan prices, currencies, listing limits, entitlements, credit packs, and geographic placement rates in the broker plan admin screen; an empty database has no purchasable plans and no promotion rates.
+
+| Method | Path | Permission / identity | Purpose |
+| --- | --- | --- | --- |
+| GET | `/plans?limit={n}&offset={n}&sort={code|-code}` | `broker:promotion:view` | List active global broker plans (limit 1–100, default 50), sorted by code. |
+| GET | `/billing/subscription` | `broker:billing:manage` | Read the active tenant broker subscription. |
+| POST | `/billing/subscribe?plan_code={code}` | `broker:billing:manage` | Subscribe through the configured payment provider; requires `Idempotency-Key` (8–128 characters). |
+| GET | `/credits?limit={n}&offset={n}` | `broker:billing:manage` | Read tenant balance and paginated credit ledger (limit 1–100). |
+| GET | `/credits/balance` | `broker:promotion:view` | Read tenant promotion credit balance. |
+| POST | `/credits/purchase?plan_code={code}&pack_code={code}` | `broker:billing:manage` | Purchase a configured credit pack; requires `Idempotency-Key`. |
+| GET | `/promotions?status={status}&limit={n}&offset={n}` | `broker:promotion:view` | Read tenant promotions with bounded pagination and optional status. |
+| POST | `/promotions/estimate` | `broker:promotion:manage` | Validate eligibility and calculate credits from configured scope, placement, and duration. |
+| POST | `/promotions` | `broker:promotion:manage` | Create scheduled or active promotion and atomically debit credits and append a ledger entry; requires `Idempotency-Key`. |
+| GET | `/admin/plans?is_active={bool}&limit={n}&offset={n}&sort={code|-code}` | Platform `super_admin` | List configured plans, optionally filtered by active state (limit 1–100, default 50). |
+| POST | `/admin/plans` | Platform `super_admin` | Create a validated plan and entitlements; requires `Idempotency-Key` (8–128 characters). Repeating the same key and body returns the created plan. |
+| PUT | `/admin/plans/{code}` | Platform `super_admin` | Update plan configuration and increment its version. |
+
+Promotion request fields: `listing_id`, `scope` (`city`, `locality`, `province`, `country`), configured `location_code`, `placement_type` (`featured`, `premium`, `urgent`), and timezone-aware `starts_at`/`ends_at`. Promotion requires an approved broker, a live and moderation-approved organization listing, an active plan, owner consent, a licence matching the listing's country, and promotion entitlement. Future-dated promotions are stored as `scheduled`; automatic activation and expiry workers are not part of M7. Invalid request or business rules return the existing FastAPI `detail` error envelope with 422; permission failures return 403; insufficient credits or reused idempotency keys with different payloads return 409; unsupported Mongo transactions return 503.
+
+`BROKER_PAYMENT_PROVIDER` defaults to `mock`, which produces deterministic receipts and makes no external calls. Transactional subscription, credit, and promotion operations require a MongoDB replica set. The optional `docker-compose.broker-replica.yml` overlay uses its own named volume and does not modify or reuse the standard Mongo volume. The default standalone Mongo configuration fails closed with 503 for these operations. No automatic charge refund is applicable to the mock provider; production adapters must add a compensating refund before they are enabled.

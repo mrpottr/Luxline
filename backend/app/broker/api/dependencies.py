@@ -10,6 +10,11 @@ from backend.app.models import User
 from backend.app.broker.application.access_use_cases import ListingAccessUseCases
 from backend.app.broker.domain.roles import BrokerPermission, BrokerRole
 from backend.app.broker.repositories.organization_access_repository import BrokerOrganizationAccessRepository
+from backend.app.broker.application.monetization_use_cases import AdminPlanUseCases, MonetizationUseCases
+from backend.app.broker.services.mongo_monetization_provider import MongoBrokerMonetizationProvider
+from backend.app.broker.services.payment_provider import MockBrokerPaymentProvider
+from backend.app.broker.repositories.monetization_repository import BrokerMonetizationRepository
+from backend.app.broker.config import listing_config
 
 
 @dataclass(frozen=True)
@@ -76,3 +81,23 @@ def require_broker_permission(permission: BrokerPermission):
         return context
 
     return _dependency
+
+
+def get_monetization_use_cases(context: BrokerContext = Depends(get_broker_context)) -> MonetizationUseCases:
+    if listing_config.payment_provider != "mock":
+        raise HTTPException(status_code=503, detail="Configured broker payment provider is unavailable")
+    return MonetizationUseCases(
+        MongoBrokerMonetizationProvider(context.organization_id),
+        MockBrokerPaymentProvider(),
+        context.permissions,
+        organization_id=context.organization_id,
+        actor_user_id=context.user.id,
+        role=context.role,
+    )
+
+
+def get_admin_plan_use_cases(current_user: User = Depends(get_current_user)) -> AdminPlanUseCases:
+    return AdminPlanUseCases(
+        BrokerMonetizationRepository(organization_id=0),
+        actor_role=current_user.role,
+    )

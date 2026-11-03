@@ -52,3 +52,12 @@ The only shared route seam change is broker-router registration. The existing `/
 ### M6 Dashboard and Analytics
 
 The broker route registry is the only backend route seam changed. Analytics events are derived from organization-scoped broker leads/messages, phone-reveal records, and new anonymous view/impression events for this broker's listings, then materialized in new broker collections with daily rollups. The approved `HomePage.jsx` hook sends tracking only while the frontend flag is on; existing marketplace listing APIs and response shapes are untouched. CTR is detail views divided by visible-card impressions and is null without impressions.
+### M7 Shared seam additions
+
+| File | Seam Category | Milestone | Reason & What Changed |
+| :--- | :--- | :--- | :--- |
+| `backend/app/broker/api/router.py` | Broker route registry | M7 | Added broker plans, billing, credits, promotions, and platform-admin plan routes under the existing flag guard. |
+| `backend/.env.example` | Environment schema | M7 | Documented `BROKER_PAYMENT_PROVIDER=mock` as an optional safe-default provider and removed its duplicate example entry. |
+| `frontend/index.jsx` | Route registry | M7 | Routed broker imports through the public broker module entry point; route is still absent while the flag is off. |
+| `frontend/components/HomePage.jsx` | Navigation registry | M7 | Imported the broker navigation predicate through the public module entry point without changing its flag and role behavior. |
+| `frontend/components/AdminDashboard.jsx` | Navigation registry | M7 | Added a broker plan editor tab only when the frontend feature flag is enabled, inside the existing super-admin portal. |

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { canShowBrokerNavigation } from './broker/featureFlag.mjs';
+import { canShowBrokerNavigation } from './broker';
 import './HomePage.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';

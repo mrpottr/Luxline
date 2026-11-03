@@ -1,0 +1,23 @@
+# Opt-in, isolated MongoDB replica set for broker multi-document transactions.
+# This overlay uses its own named volume and never mounts the normal mongo_data volume.
+services:
+  db:
+    command: ["mongod", "--replSet", "broker-rs", "--bind_ip_all"]
+    volumes:
+      - broker_replica_data:/data/db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --eval "try { rs.status().ok } catch (error) { rs.initiate({_id:'broker-rs',members:[{_id:0,host:'db:27017'}]}).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+  backend:
+    environment:
+      DATABASE_URL: mongodb://db:27017/luxline?replicaSet=broker-rs
+      BROKER_PAYMENT_PROVIDER: ${BROKER_PAYMENT_PROVIDER:-mock}
+
+volumes:
+  broker_replica_data:

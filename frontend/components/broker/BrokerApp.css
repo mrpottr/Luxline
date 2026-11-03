@@ -240,6 +240,41 @@
   opacity: 0.9;
 }
 
+.broker-btn-gold:disabled,
+.broker-btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.broker-btn-secondary {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  background: #1a1d24;
+  color: #e5e7eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.broker-form-error,
+.broker-form-success {
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.broker-form-error {
+  border: 1px solid #7f1d1d;
+  background: #2a1012;
+  color: #fecaca;
+}
+
+.broker-form-success {
+  border: 1px solid #14532d;
+  background: #0d2116;
+  color: #bbf7d0;
+}
+
 .broker-listing-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -505,6 +540,96 @@
   font-size: 0.78rem;
 }
 
+.broker-promotion-form,
+.broker-plan-admin-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.broker-promotion-form label,
+.broker-plan-admin-form label {
+  display: grid;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 0.84rem;
+}
+
+.broker-promotion-form input,
+.broker-promotion-form select,
+.broker-plan-admin-form input,
+.broker-plan-admin-form textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid #343943;
+  border-radius: 6px;
+  background: #0d0f12;
+  color: #f3f4f6;
+}
+
+.broker-promotion-actions,
+.broker-admin-form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+.broker-promotion-estimate,
+.broker-credit-balance {
+  grid-column: 1 / -1;
+  color: #d4af37;
+}
+
+.broker-section-heading {
+  margin: 30px 0 12px;
+  color: #f3f4f6;
+}
+
+.broker-billing-summary,
+.broker-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.broker-billing-summary article,
+.broker-plan-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #343943;
+  border-radius: 8px;
+  background: #0d0f12;
+}
+
+.broker-billing-summary span,
+.broker-plan-card > span {
+  color: #9da3af;
+  font-size: 0.82rem;
+}
+
+.broker-plan-card h3,
+.broker-plan-card strong {
+  color: #d4af37;
+}
+
+.broker-plan-card ul {
+  padding-left: 20px;
+  color: #cbd5e1;
+}
+
+.broker-credit-packs {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #262930;
+}
+
 @media (max-width: 640px) {
   .broker-listing-form-grid,
   .broker-listing-form-grid--price {
@@ -528,6 +653,11 @@
 
   .broker-content {
     padding: 16px;
+  }
+
+  .broker-promotion-form,
+  .broker-plan-admin-form {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

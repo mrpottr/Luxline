@@ -58,6 +58,11 @@ def _messages_per_minute() -> int:
         return 20
 
 
+def _payment_provider() -> str:
+    configured = os.getenv("BROKER_PAYMENT_PROVIDER", "mock").strip().lower()
+    return configured if configured == "mock" else "unsupported"
+
+
 @dataclass(frozen=True)
 class BrokerListingConfig:
     price_floors: dict[str, dict[str, float]]
@@ -66,6 +71,7 @@ class BrokerListingConfig:
     bulk_requests_per_minute: int
     media_uploads_per_minute: int
     messages_per_minute: int
+    payment_provider: str
     categories: tuple[str, ...]
 
 
@@ -76,5 +82,6 @@ listing_config = BrokerListingConfig(
     bulk_requests_per_minute=_bulk_requests_per_minute(),
     media_uploads_per_minute=_media_uploads_per_minute(),
     messages_per_minute=_messages_per_minute(),
+    payment_provider=_payment_provider(),
     categories=tuple(category.value for category in ListingCategory),
 )

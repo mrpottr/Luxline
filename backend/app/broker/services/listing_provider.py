@@ -8,6 +8,7 @@ from typing import Any
 
 from backend.app.broker.domain.quality_score import QualityScoreCalculator
 from backend.app.broker.models.listing_extension import BrokerListing
+from backend.app.broker.models.monetization import BrokerSubscription
 from backend.app.broker.models.listing_revision import BrokerListingRevision
 from backend.app.broker.repositories.listing_revision_repository import BrokerListingRevisionRepository
 from backend.app.broker.models.branch import BrokerBranch
@@ -304,6 +305,26 @@ class MongoListingProvider:
             and (not subscription.ends_at or subscription.ends_at > now)
             for subscription in subscriptions
         )
+        broker_subscription = BrokerSubscription.objects(
+            organization_id=self.organization_id, status="active", is_deleted=False,
+            starts_at__lte=now, ends_at__gt=now,
+        ).order_by("-ends_at").first()
+        if broker_subscription:
+            active_listing_ids = list(BrokerListing.objects(
+                organization_id=self.organization_id, is_deleted=False,
+            ).scalar("listing_id"))
+            active_listing_count = Listing.objects(
+                agency_id=self.organization_id, id__in=active_listing_ids,
+                status=ListingStatus.active,
+            ).count()
+            at_listing_limit = bool(
+                broker_subscription.listing_limit_snapshot is not None
+                and listing.status != ListingStatus.active
+                and active_listing_count >= broker_subscription.listing_limit_snapshot
+            )
+            active_plan = active_plan or not at_listing_limit
+            if broker_subscription.entitlements_snapshot.get("listings_enabled") is False:
+                active_plan = False
         licences = profile.licences if profile else {}
         return {
             "is_approved_broker": bool(profile and profile.status == BrokerStatus.approved),

@@ -36,3 +36,14 @@
 - Agents can only query/export their own assigned lead and response data; managers, owners, and analytics viewers use organization scope.
 - Add anonymous, session-deduplicated public listing detail views and visible-card impressions through two flag-guarded broker analytics routes. The approved HomePage hook sends only listing IDs, never buyer identity; impressions require 50% visibility and are counted once per listing per browser session. Public events are accepted only for active, moderation-approved listings with an approved broker profile and are throttled per visitor/listing. CTR is detail views divided by impressions and remains unavailable when a report has no impressions. Existing marketplace endpoint contracts remain unchanged.
 
+---
+
+## M7: Plans, wallet, promotions, and transactions
+
+- Store plans and billing in new `broker_` collections. Admin-configured values are the only source of prices, currencies, listing limits, entitlements, credit packs, and promotion rates; an empty configuration means no broker plan or paid promotion is available.
+- Use `BROKER_PAYMENT_PROVIDER=mock` by default. The mock emits deterministic idempotent receipts and makes no external call. Unsupported provider values fail closed rather than silently charging through another provider.
+- Keep credit balance adjustments, append-only ledger rows, subscription replacement, and promotion creation inside MongoDB transactions. Never fall back to multiple standalone writes if the database cannot transact.
+- The existing Compose Mongo service is standalone and its persistent volume must stay untouched. `docker-compose.broker-replica.yml` is an explicit opt-in overlay with its own volume for local transaction work; it is not started automatically.
+- Plan subscriptions and credit pack purchases use stable request keys. Credit debit plus ledger row plus promotion row commit atomically. Future-dated promotions start as `scheduled`; this milestone does not add an activation worker.
+- Existing marketplace subscriptions continue to satisfy existing publish checks. A broker plan adds plan limits and entitlements without changing marketplace subscription documents or endpoints.
+- The admin plan screen is nested in the current admin portal and guarded by the frontend feature flag; broker owners alone see billing, while owners and managers see promotion tools. API use cases and routes enforce permissions independently.

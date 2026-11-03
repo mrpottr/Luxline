@@ -2,7 +2,7 @@
 
 **Branch:** `main`
 **Feature Flag:** `BROKER_PANEL_ENABLED` (Default: `false`)  
-**Status:** M0–M5 are implemented on `main`; M6 is implemented with session-scoped listing views and visible-card impressions. CTR is unavailable when impression data is absent.
+**Status:** M0 through M6 are implemented. M7 billing, credits, and promotion management are implemented; marketplace ranking integration remains pending. Broker flags remain off by default.
 
 This milestone plan adapts the Broker Panel specification to Luxline's architecture (FastAPI + MongoEngine + React + Vite). Implementation will strictly follow the safety rules: additive-only, frozen existing APIs, absolute tenant isolation, and verification before committing.
 
@@ -170,17 +170,25 @@ All modifications to existing files are strictly confined to safe seams and logg
 ### Milestone 7: Promotions, Credits Wallet & Plans
 * **Goal:** Visibility boosts (featured, premium, urgent tag, geo-targeting), append-only credit ledger with atomic balance checks, and plan entitlement enforcement.
 * **New Files to Create:**
-  * `backend/app/broker/models/monetization.py` (`broker_promotions`, `broker_credit_ledger`, `broker_plans`)
-  * `backend/app/broker/domain/ledger.py` (Atomic credit debit/credit with refund logic)
-  * `backend/app/broker/api/promotions.py`
-  * `backend/app/broker/api/credits.py`
+  * `backend/app/broker/models/monetization.py` (`broker_plans`, `broker_subscriptions`, `broker_credit_accounts`, `broker_credit_ledger`, `broker_promotions`)
+  * `backend/app/broker/domain/monetization.py` (Price validation, configured promotion cost and idempotency digest)
+  * `backend/app/broker/application/monetization_use_cases.py` and `monetization_ports.py`
+  * `backend/app/broker/repositories/monetization_repository.py` (Tenant repositories and Mongo transaction boundary)
+  * `backend/app/broker/api/monetization.py` and `admin_monetization.py`
+  * `backend/app/broker/services/payment_provider.py` (Deterministic offline payment mock)
+  * `docker-compose.broker-replica.yml` (Opt-in isolated replica set for Mongo transactions)
   * `frontend/components/broker/screens/PromotionsScreen.jsx` (Boost calendar, cost preview)
   * `frontend/components/broker/screens/BillingPlansScreen.jsx` (Ledger statement, plan limits)
-  * `tests/test_broker_credits_ledger.py`
-* **Shared Files Touched:** None.
+  * `frontend/components/broker/BrokerPlanAdminScreen.jsx` and `frontend/components/broker/index.jsx`
+  * `tests/test_broker_monetization.py`
+* **Shared Files Touched:** `backend/app/broker/api/router.py`, `backend/.env.example`, `frontend/index.jsx`, `frontend/components/HomePage.jsx`, `frontend/components/AdminDashboard.jsx`.
 * **Success Criteria:**
   * Negative balance prevention via atomic transaction.
-  * Clear audit trail of credit spending and promotion expiry.
+  * Clear append-only audit trail of credit movements.
+
+**Completion status:** Plans and entitlements are managed in the existing super-admin portal. Broker owners can subscribe and purchase configured credit packs using the deterministic mock provider. Promotion estimates use configured geography, placement, and duration prices; promotion creation atomically debits the tenant wallet, appends a ledger row, and creates a scheduled or active promotion. Multi-document operations require the opt-in broker replica-set Compose overlay. Existing marketplace subscriptions remain valid and their APIs are unchanged. The scheduled promotion activation/expiry worker and marketplace ranking integration are deferred; this milestone does not claim that a paid boost has changed search ranking.
+
+**Verification:** Backend suite: 101 passed, 5 skipped (isolated Mongo integration URL not configured). Frontend suite: 3 passed. Frontend lint: 0 errors, 21 existing warnings. Production builds passed with `VITE_BROKER_PANEL_ENABLED` both false and true. Compose overlay configuration and Python syntax checks passed. No typecheck script or Mongo migration framework exists in this repository; no database was started or modified.
 
 ---
 

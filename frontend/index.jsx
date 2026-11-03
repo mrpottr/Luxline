@@ -3,8 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomePage from './components/HomePage';
 import AdminDashboard from './components/AdminDashboard';
-import BrokerApp from './components/broker/BrokerApp';
-import { isBrokerPanelEnabled } from './components/broker/featureFlag.mjs';
+import { BrokerApp, isBrokerPanelEnabled } from './components/broker';
 import './components/HomePage.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

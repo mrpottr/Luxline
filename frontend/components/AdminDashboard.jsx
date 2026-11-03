@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './AdminDashboard.css';
+import { BrokerPlanAdminScreen, isBrokerPanelEnabled, translateBrokerMessage } from './broker';
+
+const BROKER_PANEL_ENABLED = isBrokerPanelEnabled(import.meta.env.VITE_BROKER_PANEL_ENABLED);
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
@@ -522,6 +525,13 @@ export default function AdminDashboard() {
           >
             📜 Audit Logs
           </button>
+          {BROKER_PANEL_ENABLED && <button
+            type="button"
+            className={`tab-btn ${activeTab === 'brokerPlans' ? 'active' : ''}`}
+            onClick={() => setActiveTab('brokerPlans')}
+          >
+            {translateBrokerMessage('Broker Plans', localStorage.getItem('luxline_language') || navigator.language)}
+          </button>}
         </nav>
       </header>
 
@@ -1104,6 +1114,8 @@ export default function AdminDashboard() {
       )}
 
       {/* Tab 7: Audit Logs */}
+      {BROKER_PANEL_ENABLED && activeTab === 'brokerPlans' && <BrokerPlanAdminScreen token={token} />}
+
       {activeTab === 'audit' && (
         <div className="admin-tab-content">
           <section className="audit-section">
