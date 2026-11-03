@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import './BrokerApp.css';
 import OnboardingScreen from './screens/OnboardingScreen';
 import PublicProfileEditor from './screens/PublicProfileEditor';
+import TeamScreen from './screens/TeamScreen';
+import BranchesScreen from './screens/BranchesScreen';
 
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -115,7 +117,14 @@ export default function BrokerApp() {
             className={`broker-nav-item ${activeTab === 'team' ? 'active' : ''}`}
             onClick={() => setActiveTab('team')}
           >
-            👥 Team & Branches
+            👥 Team Members
+          </button>
+          <button
+            type="button"
+            className={`broker-nav-item ${activeTab === 'branches' ? 'active' : ''}`}
+            onClick={() => setActiveTab('branches')}
+          >
+            🏢 Regional Branches
           </button>
           <button
             type="button"
@@ -165,6 +174,12 @@ export default function BrokerApp() {
           )}
           {activeTab === 'profile' && (
             <PublicProfileEditor token={token} apiBase={BROKER_API_BASE} />
+          )}
+          {activeTab === 'team' && (
+            <TeamScreen token={token} apiBase={BROKER_API_BASE} />
+          )}
+          {activeTab === 'branches' && (
+            <BranchesScreen token={token} apiBase={BROKER_API_BASE} />
           )}
           {activeTab === 'dashboard' && (
             <div className="broker-card">
