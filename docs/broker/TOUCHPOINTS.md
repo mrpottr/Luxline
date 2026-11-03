@@ -61,3 +61,14 @@ The broker route registry is the only backend route seam changed. Analytics even
 | `frontend/index.jsx` | Route registry | M7 | Routed broker imports through the public broker module entry point; route is still absent while the flag is off. |
 | `frontend/components/HomePage.jsx` | Navigation registry | M7 | Imported the broker navigation predicate through the public module entry point without changing its flag and role behavior. |
 | `frontend/components/AdminDashboard.jsx` | Navigation registry | M7 | Added a broker plan editor tab only when the frontend feature flag is enabled, inside the existing super-admin portal. |
+
+### M8 Shared seam additions
+
+| File | Seam Category | Milestone | Reason & What Changed |
+| :--- | :--- | :--- | :--- |
+| `backend/app/broker/api/router.py` | Broker route registry | M8 | Registered broker, authenticated buyer, public profile review, and platform moderation routes under the existing backend flag guard. |
+| `frontend/components/AdminDashboard.jsx` | Navigation registry | M8 | Added a broker trust moderation tab within the existing admin portal, visible only with the frontend flag. |
+| `frontend/components/broker/BrokerApp.jsx` | Broker navigation registry | M8 | Added reviews/badges and audit navigation for owners and managers; use-cases enforce permissions independently. |
+| `frontend/components/broker/index.jsx` | Broker public module entry | M8 | Exported buyer review and admin trust screens for route/admin wiring through the feature module entry point. |
+| `frontend/index.jsx` | Route registry | M8 | Added `/buyer/reviews` only when the existing broker frontend flag is enabled. |
+| `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | M8 | Added trust navigation labels to the English, Sinhala, and Tamil broker catalogs. |

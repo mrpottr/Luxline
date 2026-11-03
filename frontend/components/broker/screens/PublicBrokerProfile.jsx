@@ -3,6 +3,7 @@ import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
 function PublicBrokerProfile({ orgId, apiBase }) {
   const [broker, setBroker] = useState(null);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -14,6 +15,12 @@ function PublicBrokerProfile({ orgId, apiBase }) {
         if (!res.ok) throw new Error('Broker not found');
         const data = await res.json();
         setBroker(data);
+        try {
+          const reviewResponse = await fetch(`${apiBase}/public/brokers/${orgId}/reviews?limit=20&offset=0`);
+          if (reviewResponse.ok) setReviews(await reviewResponse.json());
+        } catch {
+          // Reviews are supplementary; a review-service outage must not hide the public profile.
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -133,6 +140,15 @@ function PublicBrokerProfile({ orgId, apiBase }) {
           )}
         </div>
       </div>
+      <section className="broker-card" aria-labelledby="public-broker-reviews-title" style={{ marginTop: '20px' }}>
+        <h2 id="public-broker-reviews-title" className="broker-card-title">Buyer reviews</h2>
+        {!reviews.length ? <p>No public reviews yet.</p> : <div className="broker-review-list">{reviews.map((review) => <article className="broker-review-card" key={review.id}>
+          <strong className="broker-public-review-rating">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</strong>
+          <p>{review.body}</p>
+          {review.broker_reply && <blockquote>{review.broker_reply}</blockquote>}
+          <small>{new Date(review.created_at).toLocaleDateString()}</small>
+        </article>)}</div>}
+      </section>
     </div>
   );
 }

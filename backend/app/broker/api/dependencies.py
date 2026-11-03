@@ -1,7 +1,7 @@
 """FastAPI dependencies for Broker authentication, tenant isolation, and permissions."""
 
 from dataclasses import dataclass
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
 from backend.app.core.config import settings
 from backend.app.db.session import Session, get_db
@@ -83,7 +83,7 @@ def require_broker_permission(permission: BrokerPermission):
     return _dependency
 
 
-def get_monetization_use_cases(context: BrokerContext = Depends(get_broker_context)) -> MonetizationUseCases:
+def get_monetization_use_cases(request: Request, context: BrokerContext = Depends(get_broker_context)) -> MonetizationUseCases:
     if listing_config.payment_provider != "mock":
         raise HTTPException(status_code=503, detail="Configured broker payment provider is unavailable")
     return MonetizationUseCases(
@@ -93,6 +93,7 @@ def get_monetization_use_cases(context: BrokerContext = Depends(get_broker_conte
         organization_id=context.organization_id,
         actor_user_id=context.user.id,
         role=context.role,
+        source_ip=request.client.host if request.client else None,
     )
 
 

@@ -91,3 +91,25 @@ These routes require the backend feature flag, bearer authentication, an active 
 Promotion request fields: `listing_id`, `scope` (`city`, `locality`, `province`, `country`), configured `location_code`, `placement_type` (`featured`, `premium`, `urgent`), and timezone-aware `starts_at`/`ends_at`. Promotion requires an approved broker, a live and moderation-approved organization listing, an active plan, owner consent, a licence matching the listing's country, and promotion entitlement. Future-dated promotions are stored as `scheduled`; automatic activation and expiry workers are not part of M7. Invalid request or business rules return the existing FastAPI `detail` error envelope with 422; permission failures return 403; insufficient credits or reused idempotency keys with different payloads return 409; unsupported Mongo transactions return 503.
 
 `BROKER_PAYMENT_PROVIDER` defaults to `mock`, which produces deterministic receipts and makes no external calls. Transactional subscription, credit, and promotion operations require a MongoDB replica set. The optional `docker-compose.broker-replica.yml` overlay uses its own named volume and does not modify or reuse the standard Mongo volume. The default standalone Mongo configuration fails closed with 503 for these operations. No automatic charge refund is applicable to the mock provider; production adapters must add a compensating refund before they are enabled.
+
+
+
+
+## Reviews, badges, moderation, and audit
+
+Trust routes are under the same feature-flagged `/api/broker/v1` router. Broker routes require an authenticated active organization membership, approved broker profile, and the permission shown below. Public reviews expose only published reviews with explicit public consent. Buyer review creation requires authentication and ownership of the eligible closed lead; the organization ID is selected by query parameter and all lead/listing/review reads remain scoped to that organization. Review response schemas omit buyer identifiers. Platform moderation routes require the existing `super_admin` role.
+
+| Method | Path | Permission / identity | Purpose |
+| --- | --- | --- | --- |
+| GET | `/reviews?status={pending|published|rejected}&limit={n}&offset={n}` | `broker:reviews:manage` | List tenant reviews with bounded pagination. |
+| POST | `/reviews/{review_id}/reply` | `broker:reviews:manage` | Add or update a public reply to a published review. Body: `{"body":"..."}`. |
+| POST | `/reviews/{review_id}/appeal` | `broker:reviews:manage` | Submit one appeal for an eligible review. Body: `{"reason":"..."}`. Creates an admin moderation case. |
+| GET | `/badges` | `broker:analytics:view` | Re-evaluate and return versioned organization and agent badge rules, explanations, and criteria snapshots. |
+| GET | `/audit?action={action}&actor_user_id={id}&limit={n}&offset={n}` | `broker:audit:view` | Read tenant audit entries including before/after state. |
+| POST | `/buyer/reviews?organization_id={id}` | Authenticated buyer owning a closed, consented lead | Submit a 1–5 rating and 10–3000 character review with `public_consent=true`; requires `Idempotency-Key` (8–128 chars). New reviews start pending moderation. |
+| GET | `/public/brokers/{organization_id}/reviews?limit={n}&offset={n}` | Public | List only consented, published reviews for an approved broker. |
+| GET | `/admin/moderation-cases?status={open|resolved}&limit={n}&offset={n}` | Platform `super_admin` | List integrity alerts and broker appeals across tenants. |
+| POST | `/admin/moderation-cases/{case_id}/resolve` | Platform `super_admin` | Record a resolution for a moderation case. |
+| POST | `/admin/reviews/{review_id}/decision` | Platform `super_admin` | Publish or reject a review; body includes `decision` and optional `notes`. |
+
+Review integrity checks reject seller/broker self-reviews and duplicate buyer/listing reviews; detected attempts create moderation cases. Badge rule version 1 awards Verified Seller to approved broker profiles, Quality Lister for five or more approved live listings averaging quality 85+, and Responsive Agent for five or more first responses averaging at most one hour. Badge evaluations are refreshed on request. Owner/manager operations, moderation, profile decisions, member role changes, credit movements, promotions, subscriptions, and analytics exports write audit rows; money-related audit writes share their transaction. Existing profile/team writes and their additional audit records are not atomic. Validation errors use FastAPI's existing `detail` error envelope (422), permission failures return 403, duplicate integrity violations return 409, and missing resources return 404.

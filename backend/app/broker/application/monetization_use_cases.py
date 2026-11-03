@@ -17,13 +17,14 @@ class BrokerPlanIdempotencyConflict(ValueError):
 
 
 class MonetizationUseCases:
-    def __init__(self, provider: MonetizationProvider, payment: PaymentProvider, permissions: set[BrokerPermission], *, organization_id: int, actor_user_id: int, role: Any):
+    def __init__(self, provider: MonetizationProvider, payment: PaymentProvider, permissions: set[BrokerPermission], *, organization_id: int, actor_user_id: int, role: Any, source_ip: str | None = None):
         self.provider = provider
         self.payment = payment
         self.permissions = permissions
         self.organization_id = organization_id
         self.actor_user_id = actor_user_id
         self.role = role
+        self.source_ip = source_ip
 
     def _require(self, permission: BrokerPermission) -> None:
         if permission not in self.permissions:
@@ -53,7 +54,7 @@ class MonetizationUseCases:
         )
         return self.provider.subscribe_transaction(
             plan=plan, payment_reference=reference, idempotency_key=idempotency_key,
-            payload_digest=digest,
+            payload_digest=digest, actor_user_id=self.actor_user_id, source_ip=self.source_ip,
         )
 
     def wallet(self, *, limit: int, offset: int):
@@ -81,7 +82,7 @@ class MonetizationUseCases:
         )
         return self.provider.purchase_credits_transaction(
             package=package, payment_reference=reference, actor_user_id=self.actor_user_id,
-            idempotency_key=idempotency_key, payload_digest=digest,
+            source_ip=self.source_ip, idempotency_key=idempotency_key, payload_digest=digest,
         )
 
     def list_promotions(self, *, status: str | None, limit: int, offset: int):
@@ -107,7 +108,7 @@ class MonetizationUseCases:
         digest = payload_hash(payload)
         return self.provider.create_promotion_transaction(
             payload=payload, cost=cost, actor_user_id=self.actor_user_id,
-            idempotency_key=idempotency_key, payload_digest=digest,
+            source_ip=self.source_ip, idempotency_key=idempotency_key, payload_digest=digest,
         )
 
     def _validate_promotion_context(self, context: dict[str, Any] | None, scope: str, location_code: str) -> None:

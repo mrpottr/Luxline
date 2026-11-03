@@ -19,6 +19,7 @@ from backend.app.broker.models.monetization import (
     BrokerSubscription,
 )
 from backend.app.broker.models.profile import BrokerProfile, BrokerStatus
+from backend.app.broker.models.trust import BrokerAuditLog
 from backend.app.models import (
     AgencyProfile,
     Listing,
@@ -160,7 +161,7 @@ class BrokerMonetizationRepository:
         # Empty config deliberately makes paid promotion unavailable until an admin sets prices.
         return {}
 
-    def create_promotion_transaction(self, *, payload: dict[str, Any], cost: int, actor_user_id: int, idempotency_key: str, payload_digest: str) -> BrokerPromotion:
+    def create_promotion_transaction(self, *, payload: dict[str, Any], cost: int, actor_user_id: int, source_ip: str | None, idempotency_key: str, payload_digest: str) -> BrokerPromotion:
         self._ensure_indexes()
         payload = dict(payload)
         for field in ("starts_at", "ends_at"):
@@ -205,6 +206,15 @@ class BrokerMonetizationRepository:
                         promotion_id=promotion_id, reference=None,
                         idempotency_key=idempotency_key, payload_digest=payload_digest,
                     )
+                    self._insert_audit(
+                        session=session, actor_user_id=actor_user_id, actor_role="broker_member",
+                        action="promotion_created", resource_type="promotion", resource_id=promotion_id,
+                        source_ip=source_ip, after_state={"listing_id": payload["listing_id"],
+                        "scope": payload["scope"], "location_code": payload["location_code"],
+                        "placement_type": payload["placement_type"],
+                        "starts_at": payload["starts_at"].isoformat(), "ends_at": payload["ends_at"].isoformat(),
+                        "status": promotion.status, "credits_spent": cost},
+                    )
             return promotion
         except (OperationFailure, ConfigurationError) as error:
             existing = collection.find_one({
@@ -217,7 +227,7 @@ class BrokerMonetizationRepository:
                 return BrokerPromotion._from_son(existing)
             raise RuntimeError("Broker credit operations require MongoDB replica-set transaction support") from error
 
-    def purchase_credits_transaction(self, *, package: dict[str, Any], payment_reference: str, actor_user_id: int, idempotency_key: str, payload_digest: str) -> BrokerCreditLedger:
+    def purchase_credits_transaction(self, *, package: dict[str, Any], payment_reference: str, actor_user_id: int, source_ip: str | None, idempotency_key: str, payload_digest: str) -> BrokerCreditLedger:
         self._ensure_indexes()
         ledger_collection = BrokerCreditLedger._get_collection()
         existing = ledger_collection.find_one({
@@ -244,6 +254,11 @@ class BrokerMonetizationRepository:
                         reference=payment_reference, idempotency_key=idempotency_key,
                         payload_digest=payload_digest,
                     )
+                    self._insert_audit(
+                        session=session, actor_user_id=actor_user_id, actor_role="broker_owner",
+                        action="credits_purchased", resource_type="credit_ledger", resource_id=entry.id,
+                        source_ip=source_ip, after_state={"amount": entry.amount, "balance_after": balance},
+                    )
             return entry
         except (OperationFailure, ConfigurationError) as error:
             existing = ledger_collection.find_one({
@@ -255,7 +270,7 @@ class BrokerMonetizationRepository:
                 return BrokerCreditLedger._from_son(existing)
             raise RuntimeError("Broker credit operations require MongoDB replica-set transaction support") from error
 
-    def subscribe_transaction(self, *, plan: BrokerPlan, payment_reference: str, idempotency_key: str, payload_digest: str) -> BrokerSubscription:
+    def subscribe_transaction(self, *, plan: BrokerPlan, payment_reference: str, actor_user_id: int, source_ip: str | None, idempotency_key: str, payload_digest: str) -> BrokerSubscription:
         self._ensure_indexes()
         collection = BrokerSubscription._get_collection()
         existing = collection.find_one({
@@ -292,6 +307,12 @@ class BrokerMonetizationRepository:
                         idempotency_payload_hash=payload_digest,
                     )
                     collection.insert_one(subscription.to_mongo(), session=session)
+                    self._insert_audit(
+                        session=session, actor_user_id=actor_user_id, actor_role="broker_owner",
+                        action="subscription_started", resource_type="subscription", resource_id=subscription.id,
+                        source_ip=source_ip, after_state={"plan_code": plan.code, "plan_version": plan.version,
+                        "ends_at": subscription.ends_at.isoformat()},
+                    )
             return subscription
         except (OperationFailure, ConfigurationError) as error:
             existing = collection.find_one({
@@ -336,6 +357,19 @@ class BrokerMonetizationRepository:
         BrokerCreditLedger._get_collection().insert_one(entry.to_mongo(), session=session)
         return entry
 
+    def _insert_audit(self, *, session, actor_user_id: int, actor_role: str, action: str,
+                      resource_type: str, resource_id: int, source_ip: str | None,
+                      after_state: dict[str, Any]):
+        record = BrokerAuditLog(
+            organization_id=self.organization_id,
+            id=self._next_id(BrokerAuditLog, session=session),
+            actor_user_id=actor_user_id, actor_role=actor_role, action=action,
+            resource_type=resource_type, resource_id=resource_id, source_ip=source_ip,
+            before_state={}, after_state=after_state, metadata={},
+        )
+        BrokerAuditLog._get_collection().insert_one(record.to_mongo(), session=session)
+        return record
+
     @staticmethod
     def _next_id(model: Type[Document], *, session) -> int:
         sequence_id = f"{model._get_collection_name()}.id"
@@ -355,7 +389,7 @@ class BrokerMonetizationRepository:
 
     @staticmethod
     def _ensure_indexes():
-        for model in (BrokerCreditAccount, BrokerCreditLedger, BrokerPromotion, BrokerSubscription, BrokerPlan):
+        for model in (BrokerCreditAccount, BrokerCreditLedger, BrokerPromotion, BrokerSubscription, BrokerPlan, BrokerAuditLog):
             model.ensure_indexes()
 
     @staticmethod

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { withBrokerTranslations } from './i18n/withBrokerTranslations';
-import { resolveBrokerLocale } from './i18n/catalog.mjs';
+import { resolveBrokerLocale, translateBrokerMessage } from './i18n/catalog.mjs';
 import './BrokerApp.css';
 import OnboardingScreen from './screens/OnboardingScreen';
 import PublicProfileEditor from './screens/PublicProfileEditor';
@@ -15,6 +15,8 @@ import DashboardOverviewScreen from './screens/DashboardOverviewScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import PromotionsScreen from './screens/PromotionsScreen';
 import BillingPlansScreen from './screens/BillingPlansScreen';
+import ReviewsScreen from './screens/ReviewsScreen';
+import AuditLogScreen from './screens/AuditLogScreen';
 
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -92,13 +94,13 @@ function BrokerApp() {
         </div>
 
         <nav className="broker-nav">
-          <button
+          {(role === 'broker_owner' || role === 'broker_manager') && <button
             type="button"
             className={`broker-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('dashboard')}
           >
             📊 Dashboard
-          </button>
+          </button>}
           <button
             type="button"
             className={`broker-nav-item ${activeTab === 'onboarding' ? 'active' : ''}`}
@@ -162,6 +164,20 @@ function BrokerApp() {
           >
             📈 Analytics
           </button>
+          {(role === 'broker_owner' || role === 'broker_manager') && <button
+            type="button"
+            className={`broker-nav-item ${activeTab === 'trust' ? 'active' : ''}`}
+            onClick={() => setActiveTab('trust')}
+          >
+              {translateBrokerMessage('Reviews & Badges', resolveBrokerLocale(localStorage.getItem('luxline_language')))}
+          </button>}
+          {role === 'broker_owner' && <button
+            type="button"
+            className={`broker-nav-item ${activeTab === 'audit' ? 'active' : ''}`}
+            onClick={() => setActiveTab('audit')}
+          >
+              {translateBrokerMessage('Audit Log', resolveBrokerLocale(localStorage.getItem('luxline_language')))}
+          </button>}
           <button
             type="button"
             className={`broker-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
@@ -253,6 +269,8 @@ function BrokerApp() {
           {activeTab === 'analytics' && <AnalyticsScreen token={token} apiBase={BROKER_API_BASE} />}
           {activeTab === 'promotions' && (role === 'broker_owner' || role === 'broker_manager') && <PromotionsScreen token={token} apiBase={BROKER_API_BASE} />}
           {activeTab === 'billing' && role === 'broker_owner' && <BillingPlansScreen token={token} apiBase={BROKER_API_BASE} />}
+          {activeTab === 'trust' && (role === 'broker_owner' || role === 'broker_manager') && <ReviewsScreen token={token} apiBase={BROKER_API_BASE} />}
+          {activeTab === 'audit' && role === 'broker_owner' && <AuditLogScreen token={token} apiBase={BROKER_API_BASE} />}
         </div>
       </main>
     </div>

@@ -13,6 +13,8 @@ from backend.app.broker.application.public_view_use_case import (
     ListingViewRateLimitExceeded,
     RecordPublicListingView,
 )
+from backend.app.broker.api.trust_dependencies import get_broker_trust_use_cases
+from backend.app.broker.application.trust_use_cases import BrokerTrustUseCases
 from backend.app.core.config import settings
 from backend.app.broker.schemas import BrokerAnalyticsOut
 from pydantic import BaseModel, Field
@@ -91,9 +93,13 @@ def export_broker_analytics(
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     cases: AnalyticsUseCases = Depends(get_analytics_use_cases),
+    audit: BrokerTrustUseCases = Depends(get_broker_trust_use_cases),
 ):
     content = _execute(lambda: cases.export_csv(
         start=date_from, end=date_to, dimension=dimension, limit=limit, offset=offset,
+    ))
+    _execute(lambda: audit.record_data_export(
+        dimension=dimension, date_from=date_from.isoformat(), date_to=date_to.isoformat(),
     ))
     return Response(
         content=content,

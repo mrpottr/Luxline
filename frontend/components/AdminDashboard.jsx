@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './AdminDashboard.css';
-import { BrokerPlanAdminScreen, isBrokerPanelEnabled, translateBrokerMessage } from './broker';
+import { BrokerPlanAdminScreen, TrustModerationAdminScreen, isBrokerPanelEnabled, translateBrokerMessage } from './broker';
 
 const BROKER_PANEL_ENABLED = isBrokerPanelEnabled(import.meta.env.VITE_BROKER_PANEL_ENABLED);
 
@@ -531,6 +531,13 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab('brokerPlans')}
           >
             {translateBrokerMessage('Broker Plans', localStorage.getItem('luxline_language') || navigator.language)}
+          </button>}
+          {BROKER_PANEL_ENABLED && <button
+            type="button"
+            className={`tab-btn ${activeTab === 'brokerTrust' ? 'active' : ''}`}
+            onClick={() => setActiveTab('brokerTrust')}
+          >
+              {translateBrokerMessage('Broker Trust', localStorage.getItem('luxline_language') || navigator.language)}
           </button>}
         </nav>
       </header>
@@ -1115,6 +1122,8 @@ export default function AdminDashboard() {
 
       {/* Tab 7: Audit Logs */}
       {BROKER_PANEL_ENABLED && activeTab === 'brokerPlans' && <BrokerPlanAdminScreen token={token} />}
+
+      {BROKER_PANEL_ENABLED && activeTab === 'brokerTrust' && <TrustModerationAdminScreen token={token} />}
 
       {activeTab === 'audit' && (
         <div className="admin-tab-content">

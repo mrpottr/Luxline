@@ -414,6 +414,97 @@ class BrokerSubscriptionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BrokerReviewCreate(BaseModel):
+    lead_id: int = Field(ge=1)
+    rating: int = Field(ge=1, le=5)
+    body: str = Field(min_length=10, max_length=3000)
+    public_consent: bool
+
+
+class BrokerReviewReply(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class BrokerReviewAppeal(BaseModel):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class BrokerReviewOut(BaseModel):
+    id: int
+    organization_id: int
+    lead_id: int
+    listing_id: int
+    rating: int
+    body: str
+    public_consent: bool
+    status: str
+    broker_reply: str | None = None
+    replied_at: datetime | None = None
+    appeal_state: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerBadgeOut(BaseModel):
+    id: int
+    organization_id: int
+    subject_type: str
+    subject_id: int
+    badge_code: str
+    rule_version: int
+    awarded: bool
+    explanation: str
+    criteria_snapshot: dict[str, Any]
+    evaluated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerAuditLogOut(BaseModel):
+    id: int
+    organization_id: int
+    actor_user_id: int | None = None
+    actor_role: str | None = None
+    action: str
+    resource_type: str
+    resource_id: int | None = None
+    source_ip: str | None = None
+    before_state: dict[str, Any]
+    after_state: dict[str, Any]
+    metadata: dict[str, Any]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerModerationCaseOut(BaseModel):
+    id: int
+    organization_id: int
+    case_type: str
+    resource_type: str
+    resource_id: int
+    actor_user_id: int | None = None
+    reason: str
+    severity: str
+    status: str
+    resolution: str | None = None
+    resolved_by: int | None = None
+    resolved_at: datetime | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerModerationResolve(BaseModel):
+    resolution: str = Field(min_length=1, max_length=1000)
+
+
+class BrokerReviewDecision(BaseModel):
+    decision: str = Field(pattern="^(publish|reject)$")
+    notes: str | None = Field(default=None, max_length=1000)
+
+
 class BrokerListingCreate(BaseModel):
     title: str = Field(min_length=5, max_length=255)
     description: str | None = Field(default=None, max_length=20000)

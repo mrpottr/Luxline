@@ -12,6 +12,8 @@ from backend.app.broker.api.inbox import router as inbox_router, buyer_router
 from backend.app.broker.api.analytics import router as analytics_router, view_router
 from backend.app.broker.api.monetization import router as monetization_router
 from backend.app.broker.api.admin_monetization import router as admin_monetization_router
+from backend.app.broker.api.trust import router as trust_router, buyer_router as buyer_trust_router
+from backend.app.broker.api.trust import public_router as public_trust_router, admin_router as admin_trust_router
 
 router = APIRouter(dependencies=[Depends(verify_broker_panel_enabled)])
 router.include_router(onboarding_router)
@@ -26,6 +28,10 @@ router.include_router(analytics_router)
 router.include_router(view_router)
 router.include_router(monetization_router)
 router.include_router(admin_monetization_router)
+router.include_router(trust_router)
+router.include_router(buyer_trust_router)
+router.include_router(public_trust_router)
+router.include_router(admin_trust_router)
 
 
 @router.get("/health", tags=["broker-health"])

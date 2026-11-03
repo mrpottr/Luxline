@@ -2,7 +2,7 @@
 
 **Branch:** `main`
 **Feature Flag:** `BROKER_PANEL_ENABLED` (Default: `false`)  
-**Status:** M0 through M6 are implemented. M7 billing, credits, and promotion management are implemented; marketplace ranking integration remains pending. Broker flags remain off by default.
+**Status:** M0 through M7 are implemented. M8 trust, reviews, badges, moderation, and audit integration are implemented on `main`; marketplace ranking integration remains pending. Broker flags remain off by default.
 
 This milestone plan adapts the Broker Panel specification to Luxline's architecture (FastAPI + MongoEngine + React + Vite). Implementation will strictly follow the safety rules: additive-only, frozen existing APIs, absolute tenant isolation, and verification before committing.
 
@@ -18,6 +18,12 @@ All modifications to existing files are strictly confined to safe seams and logg
 | `backend/app/main.py` | Router Registry | Add conditional inclusion: `if settings.broker_panel_enabled: app.include_router(broker_router, prefix="/api/broker/v1")` |
 | `frontend/index.jsx` | Route Registry | Conditionally mount `<Route path="/broker/*" element={<BrokerApp />} />` when feature flag is active |
 | `frontend/components/HomePage.jsx` | Navigation Seam | Add an additive link "Broker Portal" to `AGENT_NAV_LINKS` visible when user has broker capability and flag is on |
+| `backend/app/broker/api/router.py` | Broker route registry | Register flag-guarded trust, review, public review, buyer review, and platform moderation routes. |
+| `frontend/components/AdminDashboard.jsx` | Navigation registry | Add a feature-flagged moderation view inside the existing admin portal. |
+| `frontend/components/broker/BrokerApp.jsx` | Broker navigation registry | Add owner/manager-only review, badge, and audit screens. |
+| `frontend/components/broker/index.jsx` | Broker public module entry | Export only the flag-guarded buyer review and admin moderation screens to app routes. |
+| `frontend/index.jsx` | Route registry | Add a buyer review route only when the frontend flag is enabled. |
+| `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | Add broker trust navigation labels in English, Sinhala, and Tamil. |
 
 ---
 
@@ -194,18 +200,23 @@ All modifications to existing files are strictly confined to safe seams and logg
 
 ### Milestone 8: Trust, Reviews, Badges & Audit Trail
 * **Goal:** Deterministic badge engine (Verified Seller, Responsive Agent, Quality Lister), review collection with replies and dispute handling, anti-manipulation checks, and tenant audit log.
-* **New Files to Create:**
-  * `backend/app/broker/models/trust.py` (`broker_badges`, `broker_reviews`, `broker_audit_logs`)
-  * `backend/app/broker/domain/badges.py` (Rules-based badge awarding with explainability)
-  * `backend/app/broker/api/reviews.py`
-  * `backend/app/broker/api/audit.py`
-  * `frontend/components/broker/screens/ReviewsScreen.jsx`
-  * `frontend/components/broker/screens/AuditLogScreen.jsx`
-  * `tests/test_broker_trust_badges.py`
-* **Shared Files Touched:** None.
+* **New Files Created:**
+  * `backend/app/broker/models/trust.py` (`broker_badges`, `broker_reviews`, `broker_moderation_cases`, `broker_audit_logs`)
+  * `backend/app/broker/domain/trust.py` (review validation and deterministic, explainable, versioned badge rules)
+  * `backend/app/broker/application/trust_ports.py` and `trust_use_cases.py`
+  * `backend/app/broker/api/trust.py` and `trust_dependencies.py`
+  * `backend/app/broker/repositories/trust_repository.py`
+  * `frontend/components/broker/screens/ReviewsScreen.jsx`, `AuditLogScreen.jsx`, `BuyerReviewScreen.jsx`, and `TrustModerationAdminScreen.jsx`
+  * `tests/test_broker_trust.py`
+* **Broker feature files extended:** `backend/app/broker/api/onboarding.py`, `api/team.py`, `api/analytics.py`, `api/dependencies.py`, `application/monetization_ports.py`, `application/monetization_use_cases.py`, and `repositories/monetization_repository.py` add approval, role, export, credit, subscription, and promotion audit data.
+* **Shared Files Touched:** `backend/app/broker/api/router.py`, `frontend/components/AdminDashboard.jsx`, `frontend/components/broker/BrokerApp.jsx`, `frontend/components/broker/index.jsx`, `frontend/components/broker/i18n/catalog.mjs`, `frontend/index.jsx`.
 * **Success Criteria:**
   * Self-reviews and duplicate reviews blocked.
   * Every badge displays clear justification criteria.
+
+**Safety decisions:** Buyer reviews require the authenticated owner of a closed, consented broker lead; one review per buyer/listing is enforced by a unique index and repository check. Reviews are pending moderation and only explicitly consented, published reviews are public. Integrity violations open platform moderation cases. Badge rules use fixed version 1 thresholds and persist criteria snapshots/explanations. Broker repositories always require an organization ID; the platform-admin moderation use case is super-admin gated and performs global moderation only through its dedicated methods. The user-facing review response schema omits buyer identifiers.
+
+**Limitations:** Existing organization approval and team changes append audit after their existing write, so those multi-collection operations are not atomic. Credit, subscription, and promotion audit inserts share their existing Mongo transaction. Badge refresh is request-driven; no worker was added. Review moderation is visible in the admin portal. Repository/database integration and replica-set transaction tests require `BROKER_TEST_DATABASE_URL` and remain skipped when it is unset.
 
 ---
 
@@ -246,3 +257,8 @@ All modifications to existing files are strictly confined to safe seams and logg
 2. Each milestone will be preceded by a list of files to be created and touched.
 3. Every milestone will conclude with automated tests, `TOUCHPOINTS.md` updates, and a concise status report.
 
+
+
+**Completion status:** M8 trust models and routes are implemented behind the existing broker flag, including authenticated buyer review submission, tenant reviews/replies/appeals, public consented reviews, versioned explainable badges, platform moderation cases, and audit entries. Member and verification decisions plus analytics exports now add audit events; M7 money and promotion audit events are included in their Mongo transactions. UI screens are exposed only through the feature flag and existing admin portal. Marketplace/public-profile page review loading is best-effort so a trust endpoint outage does not block the profile.
+
+**Verification:** Frontend tests: 3 passed; lint: 0 errors and 21 existing warnings; Vite builds passed with `VITE_BROKER_PANEL_ENABLED` false and true; Python compileall, Compose config, and `git diff --check` passed. Backend unit tests could not run because FastAPI and project dependencies are absent from local Python environments (`No module named fastapi`); full-suite regression remains unverified in this environment. No typecheck script or migration framework exists. No Mongo instance was started or changed. Audit writes after existing profile/team writes remain non-atomic.

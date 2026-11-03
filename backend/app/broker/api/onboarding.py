@@ -1,6 +1,6 @@
 """Broker onboarding, application submission, and public showcase endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from backend.app.dependencies import get_current_user, require_roles
 from backend.app.models import User, UserRole
@@ -8,6 +8,7 @@ from backend.app.broker.api.dependencies import BrokerContext, get_broker_contex
 from backend.app.broker.domain.onboarding import OnboardingRules
 from backend.app.broker.models.profile import BrokerProfile, BrokerStatus
 from backend.app.broker.repositories.profile_repository import BrokerProfileRepository
+from backend.app.broker.repositories.trust_repository import BrokerTrustRepository
 from backend.app.broker.schemas import (
     BrokerProfileOut,
     BrokerProfileUpdate,
@@ -125,6 +126,7 @@ def get_public_broker(organization_id: int):
 def admin_review_broker(
     organization_id: int,
     decision_payload: BrokerVerificationDecision,
+    request: Request,
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Platform admin review to approve, reject, or suspend a broker profile."""
@@ -141,8 +143,16 @@ def admin_review_broker(
     if not target_status:
         raise HTTPException(status_code=400, detail="Invalid review decision")
 
+    previous_status = profile.status.value
     profile.status = target_status
     profile.decision_notes = decision_payload.notes or f"Reviewed by Admin {admin.id}"
     profile.save()
+    BrokerTrustRepository(organization_id).append_audit(
+        actor_user_id=admin.id, actor_role="super_admin", action="broker_verification_decided",
+        resource_type="broker_profile", resource_id=profile.id,
+        source_ip=request.client.host if request.client else None,
+        before_state={"status": previous_status}, after_state={"status": target_status.value},
+        metadata={"decision_notes": profile.decision_notes},
+    )
     return profile
 

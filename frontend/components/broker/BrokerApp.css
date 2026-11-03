@@ -630,6 +630,100 @@
   border-top: 1px solid #262930;
 }
 
+.broker-badge-grid,
+.broker-review-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.broker-badge-card,
+.broker-review-card,
+.broker-admin-case {
+  padding: 16px;
+  border: 1px solid #343943;
+  border-radius: 8px;
+  background: #0d0f12;
+}
+
+.broker-badge-card p,
+.broker-review-card p,
+.broker-admin-case p {
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.broker-badge-card small,
+.broker-review-heading span {
+  color: #9da3af;
+}
+
+.broker-review-heading,
+.broker-admin-case header,
+.broker-admin-case-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.broker-review-heading strong {
+  color: #d4af37;
+}
+
+.broker-review-card blockquote {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 3px solid #d4af37;
+  color: #cbd5e1;
+}
+
+.broker-trust-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.broker-trust-form label,
+.broker-admin-case label {
+  color: #cbd5e1;
+  font-size: 0.84rem;
+}
+
+.broker-trust-form textarea,
+.broker-admin-case textarea {
+  min-height: 76px;
+  padding: 9px 10px;
+  border: 1px solid #343943;
+  border-radius: 6px;
+  background: #0a0b0d;
+  color: #f3f4f6;
+  resize: vertical;
+}
+
+.broker-trust-form button {
+  justify-self: start;
+}
+
+.broker-admin-case-list {
+  display: grid;
+  gap: 12px;
+}
+
+.broker-admin-case header {
+  justify-content: space-between;
+}
+
+.broker-admin-case header span {
+  color: #9da3af;
+}
+
+.broker-admin-case label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
 @media (max-width: 640px) {
   .broker-listing-form-grid,
   .broker-listing-form-grid--price {
