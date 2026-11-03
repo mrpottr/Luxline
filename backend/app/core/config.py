@@ -35,6 +35,7 @@ class Settings:
     admin_bootstrap_enabled: bool = os.getenv("ADMIN_BOOTSTRAP_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
     admin_email: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "admin123")
+    broker_panel_enabled: bool = os.getenv("BROKER_PANEL_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
 
 settings = Settings()

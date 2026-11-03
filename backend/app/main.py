@@ -153,6 +153,10 @@ def create_app() -> FastAPI:
     app.include_router(admin_fraud.router, prefix=api_prefix)
     app.include_router(admin_cms.router, prefix=api_prefix)
 
+    if getattr(settings, "broker_panel_enabled", False):
+        from backend.app.broker.api import broker_router
+        app.include_router(broker_router, prefix="/api/broker/v1")
+
     return app
 
 

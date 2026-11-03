@@ -20,7 +20,8 @@ const MARKET_NAV_LINKS = [
 const AGENT_NAV_LINKS = [
   { path: '/agencies', label: 'Find Agencies' },
   { path: '/dashboard', label: 'Post Listing' },
-  { path: '/concierge', label: 'Concierge Desk' }
+  { path: '/concierge', label: 'Concierge Desk' },
+  ...(import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' ? [{ path: '/broker', label: 'Broker Portal' }] : [])
 ];
 
 const CATEGORY_OPTIONS = [
