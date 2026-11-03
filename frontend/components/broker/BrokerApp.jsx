@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './BrokerApp.css';
+import OnboardingScreen from './screens/OnboardingScreen';
+import PublicProfileEditor from './screens/PublicProfileEditor';
 
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -75,6 +77,20 @@ export default function BrokerApp() {
           </button>
           <button
             type="button"
+            className={`broker-nav-item ${activeTab === 'onboarding' ? 'active' : ''}`}
+            onClick={() => setActiveTab('onboarding')}
+          >
+            📜 Verification & Licence
+          </button>
+          <button
+            type="button"
+            className={`broker-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            🎨 Branded Showcase
+          </button>
+          <button
+            type="button"
             className={`broker-nav-item ${activeTab === 'listings' ? 'active' : ''}`}
             onClick={() => setActiveTab('listings')}
           >
@@ -144,24 +160,30 @@ export default function BrokerApp() {
         </header>
 
         <div className="broker-content">
-          <div className="broker-card">
-            <div className="broker-card-header">
-              <span className="broker-badge-pill">Milestone 0: Active Scaffold</span>
-              <h1 className="broker-card-title" style={{ marginTop: '12px' }}>
-                Broker Business Portal
-              </h1>
-              <p className="broker-card-subtitle">
-                Welcome to the Luxline business seller portal. Inventory management, CRM leads routing,
-                team allocation, and visibility boosts are managed through this interface.
-              </p>
-            </div>
+          {activeTab === 'onboarding' && (
+            <OnboardingScreen token={token} apiBase={BROKER_API_BASE} />
+          )}
+          {activeTab === 'profile' && (
+            <PublicProfileEditor token={token} apiBase={BROKER_API_BASE} />
+          )}
+          {activeTab === 'dashboard' && (
+            <div className="broker-card">
+              <div className="broker-card-header">
+                <span className="broker-badge-pill">Operational Dashboard</span>
+                <h1 className="broker-card-title" style={{ marginTop: '12px' }}>
+                  Broker Command Center
+                </h1>
+                <p className="broker-card-subtitle">
+                  Manage inventory, respond to inquiries, monitor lead routing, and allocate visibility boosts.
+                </p>
+              </div>
 
-            <div className="broker-status-box">
-              <div><strong>Feature Flag:</strong> BROKER_PANEL_ENABLED = {String(IS_ENABLED)}</div>
-              <div><strong>Active View:</strong> {activeTab}</div>
-              <div><strong>Target API:</strong> {BROKER_API_BASE}</div>
+              <div className="broker-status-box">
+                <div><strong>Feature Flag:</strong> BROKER_PANEL_ENABLED = {String(IS_ENABLED)}</div>
+                <div><strong>Target API:</strong> {BROKER_API_BASE}</div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </div>

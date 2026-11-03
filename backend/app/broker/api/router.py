@@ -2,8 +2,10 @@
 
 from fastapi import APIRouter, Depends
 from backend.app.broker.api.dependencies import BrokerContext, get_broker_context, verify_broker_panel_enabled
+from backend.app.broker.api.onboarding import router as onboarding_router
 
 router = APIRouter(dependencies=[Depends(verify_broker_panel_enabled)])
+router.include_router(onboarding_router)
 
 
 @router.get("/health", tags=["broker-health"])
