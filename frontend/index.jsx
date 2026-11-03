@@ -7,12 +7,13 @@ import BrokerApp from './components/broker/BrokerApp';
 import './components/HomePage.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+const brokerPanelEnabled = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true';
 root.render(
   <React.StrictMode>
     <Router>
       <Routes>
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/broker/*" element={<BrokerApp />} />
+        {brokerPanelEnabled && <Route path="/broker/*" element={<BrokerApp />} />}
         <Route path="/*" element={<HomePage />} />
       </Routes>
     </Router>

@@ -240,3 +240,28 @@
   opacity: 0.9;
 }
 
+.broker-listing-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.broker-listing-form-grid--price {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(90px, 120px);
+}
+
+.broker-listing-row {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .broker-listing-form-grid,
+  .broker-listing-form-grid--price {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .broker-listing-row {
+    align-items: flex-start !important;
+  }
+}
+

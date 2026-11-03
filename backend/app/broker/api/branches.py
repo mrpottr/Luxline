@@ -66,3 +66,4 @@ def delete_branch(
 
     repo.soft_delete(branch_id)
     return None
+

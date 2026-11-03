@@ -20,9 +20,18 @@ const MARKET_NAV_LINKS = [
 const AGENT_NAV_LINKS = [
   { path: '/agencies', label: 'Find Agencies' },
   { path: '/dashboard', label: 'Post Listing' },
-  { path: '/concierge', label: 'Concierge Desk' },
-  ...(import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' ? [{ path: '/broker', label: 'Broker Portal' }] : [])
+  { path: '/concierge', label: 'Concierge Desk' }
 ];
+
+function getTokenRole(token) {
+  try {
+    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));
+    return payload.role || null;
+  } catch {
+    return null;
+  }
+}
 
 const CATEGORY_OPTIONS = [
   { value: '', label: 'All Categories' },
@@ -140,6 +149,13 @@ export default function HomePage() {
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const [token, setToken] = useState(localStorage.getItem('luxline_token') || '');
+  const agentNavLinks = useMemo(() => {
+    const brokerAllowed = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true'
+      && getTokenRole(token) === 'business_account';
+    return brokerAllowed
+      ? [...AGENT_NAV_LINKS, { path: '/broker', label: 'Broker Portal' }]
+      : AGENT_NAV_LINKS;
+  }, [token]);
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [blogPosts, setBlogPosts] = useState([]);
@@ -2175,7 +2191,7 @@ export default function HomePage() {
             <div className="agent-menu">
               <button type="button">For Agents</button>
               <div className="agent-menu-panel">
-                {AGENT_NAV_LINKS.map((link) => (
+                {agentNavLinks.map((link) => (
                   <a key={link.path} href={link.path} onClick={(e) => onNavClick(e, link.path)}>
                     {link.label}
                   </a>

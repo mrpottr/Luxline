@@ -28,3 +28,4 @@ class BrokerMemberRepository(BaseTenantRepository[BrokerMember]):
                 setattr(member, key, value)
         member.save()
         return member
+

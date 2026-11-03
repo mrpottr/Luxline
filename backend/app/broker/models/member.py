@@ -32,3 +32,4 @@ class BrokerMember(BrokerBaseDocument):
     specialties = ListField(StringField(max_length=80), default=list)
     languages = ListField(StringField(max_length=20), default=list)
     is_active = BooleanField(default=True)
+

@@ -19,3 +19,4 @@ class TeamRules:
     def validate_owner_removal(total_owners_count: int) -> bool:
         """Prevent deleting or demoting the last remaining broker owner in an organization."""
         return total_owners_count > 1
+

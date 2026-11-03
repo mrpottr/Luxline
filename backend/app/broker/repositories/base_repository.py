@@ -71,3 +71,4 @@ class BaseTenantRepository(Generic[T]):
             return True
         instance.delete()
         return True
+

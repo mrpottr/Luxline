@@ -12,6 +12,9 @@ Per rule: "You may touch shared code only at: route registry, navigation registr
 | `backend/app/main.py` | Route registry | M0 | Conditionally included broker base router: `if getattr(settings, "broker_panel_enabled", False): from backend.app.broker.api import broker_router; app.include_router(broker_router, prefix="/api/broker/v1")`. |
 | `frontend/index.jsx` | Route registry | M0 | Registered `<Route path="/broker/*" element={<BrokerApp />} />`. `BrokerApp` checks `VITE_BROKER_PANEL_ENABLED` and displays offline fallback if disabled. |
 | `frontend/components/HomePage.jsx` | Navigation registry | M0 | Additive spread into `AGENT_NAV_LINKS`: added `{ path: '/broker', label: 'Broker Portal' }` conditionally if `VITE_BROKER_PANEL_ENABLED === 'true'`. Empty otherwise. |
+| `frontend/index.jsx` | Route registry | M4 seam correction | Mount `/broker/*` only when `VITE_BROKER_PANEL_ENABLED === 'true'`, so the off state has no broker route. |
+| `frontend/components/HomePage.jsx` | Navigation registry | M4 seam correction | Show Broker Portal only when the flag is on and the JWT role is `business_account`. |
+| `backend/.env.example` | Environment schema | M4 | Added optional broker flag, listing price floors/media/import limits, and bulk request limit examples with safe defaults. |
 
 ---
 
@@ -19,4 +22,8 @@ Per rule: "You may touch shared code only at: route registry, navigation registr
 
 | File | Seam Category | Reason & Planned Additive Change |
 | :--- | :--- | :--- |
-| `backend/app/models.py` | Model/Entity registry | Add additive document relations or properties to link `User` and `AgencyProfile` to broker entities (additive only). |
+| None | — | Broker entities remain in `backend/app/broker/models/`; no existing model registry changes are planned. |
+
+### M4 Listing Management
+
+No shared files were changed for listing persistence, routes, schemas, use cases, or screens. Broker listings and revisions use new `broker_` collections. The two frontend seam corrections above close M0 flag-off and role-visibility gaps found during M4 verification. M4 continuation adds listing media metadata and one optional environment example file; existing listing APIs remain unchanged.

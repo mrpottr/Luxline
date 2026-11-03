@@ -2,7 +2,7 @@
 
 **Branch:** `feature/broker-panel`  
 **Feature Flag:** `BROKER_PANEL_ENABLED` (Default: `false`)  
-**Status:** Awaiting User Approval  
+**Status:** Approved by continuation request; M0–M3 were already implemented on this branch.
 
 This milestone plan adapts the Broker Panel specification to Luxline's architecture (FastAPI + MongoEngine + React + Vite). Implementation will strictly follow the safety rules: additive-only, frozen existing APIs, absolute tenant isolation, and verification before committing.
 
@@ -102,20 +102,30 @@ All modifications to existing files are strictly confined to safe seams and logg
 ### Milestone 4: Listings Management, Quality Score & Bulk Import
 * **Goal:** Broker inventory management (CRUD, publish, pause, archive, revisions), category rules, configurable price floors, rich media ordering, listing quality scoring, and CSV bulk import/export.
 * **New Files to Create:**
+  * `backend/app/broker/application/ports.py` and `application/listing_use_cases.py` (provider boundary and permission-checked operations)
+  * `backend/app/broker/application/access_use_cases.py` (organization membership resolution)
+  * `backend/app/broker/api/listing_dependencies.py` (JWT-backed listing context)
+  * `backend/app/broker/config.py` (price floors and media/import limits from optional environment config)
   * `backend/app/broker/models/listing_extension.py` (`broker_listings` linking to base `listings`)
+  * `backend/app/broker/models/listing_revision.py` (`broker_listing_revisions`)
   * `backend/app/broker/domain/quality_score.py` (Algorithmic quality score: Green/Orange/Red with fix suggestions)
   * `backend/app/broker/domain/listing_rules.py` (Minimum price validation, media count rules)
-  * `backend/app/broker/services/bulk_import.py` (CSV parser, validation report, staged commit)
+  * `backend/app/broker/repositories/listing_repository.py` and `listing_revision_repository.py` (tenant-scoped listing and revision access)
+  * `backend/app/broker/repositories/organization_access_repository.py` (tenant membership lookup)
+  * `backend/app/broker/services/bulk_import.py` and `services/listing_provider.py` (CSV validation/import and Mongo adapter)
   * `backend/app/broker/api/listings.py`
   * `frontend/components/broker/screens/ListingsListScreen.jsx` (Table & cards, filters, bulk actions)
   * `frontend/components/broker/screens/ListingEditorScreen.jsx` (Multi-step editor, quality score widget)
   * `frontend/components/broker/screens/BulkImportScreen.jsx`
   * `tests/test_broker_listings.py`
-* **Shared Files Touched:** None.
+  * `docs/broker/API.md` and `docs/broker/DECISIONS.md`
+* **Shared Files Touched:** `frontend/index.jsx` (conditional route registry, flag-off behavior); `frontend/components/HomePage.jsx` (role-gated navigation). These M0 seam corrections were identified while verifying M4.
 * **Success Criteria:**
   * Quality score updates dynamically.
   * Bulk import provides a validation dry-run before persistence.
   * Base listings remain compatible with existing public search.
+
+**Resumption status:** Core listing CRUD, publish checks, assignment scoping, CSV validation/import/export, revision snapshots, media metadata, process-local bulk throttling, docs, and mocked API/use-case tests are implemented. M4 remains active pending binary upload/storage scanning, broker-string i18n, and a shared multi-worker limiter. The opt-in MongoDB tenant-isolation test passed on a newly created, isolated broker_test_* database. No production upload or distributed throttle is claimed.
 
 ---
 

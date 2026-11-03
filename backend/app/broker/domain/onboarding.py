@@ -42,3 +42,4 @@ class OnboardingRules:
             BrokerStatus.suspended: {BrokerStatus.approved},
         }
         return target in valid_transitions.get(current, set())
+

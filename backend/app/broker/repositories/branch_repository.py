@@ -10,3 +10,4 @@ class BrokerBranchRepository(BaseTenantRepository[BrokerBranch]):
 
     def find_by_code(self, code: str) -> BrokerBranch | None:
         return self._scoped_query(code=code.upper()).first()
+

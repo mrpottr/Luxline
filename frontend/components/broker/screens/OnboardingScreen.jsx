@@ -310,3 +310,4 @@ export default function OnboardingScreen({ token, apiBase, onProfileUpdated }) {
     </div>
   );
 }
+

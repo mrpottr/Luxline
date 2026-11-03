@@ -160,6 +160,7 @@ Luxline/
 * **API Client Pattern:**
   * Reusable `callApi(path, token, options)` returning parsed JSON or throwing standard `Error` containing `data.detail` and `res.status`.
 * **State Management:** React hooks (`useState`, `useEffect`, `useMemo`).
+* **i18n:** No i18n package or locale catalogs are present. Existing UI strings are inline English text; locale-aware display is done selectively with `Intl`.
 
 ---
 
@@ -210,4 +211,32 @@ Luxline/
   * *Mitigation:* Strict additive-only design. No alterations to `users`, `listings`, or `agency_profiles` schema. Broker-specific attributes attach through relational pointers.
 * **Risk 3: Feature Flag Leakage.**
   * *Mitigation:* With `BROKER_PANEL_ENABLED=false`, all `/api/broker/v1/*` routes return 404/disabled, and no broker UI elements are rendered.
+
+## 9. Resumption Baseline (2026-11-03)
+
+The working branch at resumption was `feature/broker-panel`, with M0–M3 commits present and a partially implemented, uncommitted M4 in the working tree. Baseline results before this continuation:
+
+| Check | Result |
+| --- | --- |
+| Python `compileall backend` | Pass |
+| Full Python `unittest` discovery | Pass, 26 tests |
+| Frontend Vite production build | Pass |
+| Lint | Not configured in the repository |
+| Typecheck | Not configured in the repository |
+
+The frontend has only `start` and `build` npm scripts. Backend dependencies are listed in the root `requirements.txt`; there is no pytest, lint, or typecheck configuration. The M4 worktree build was directed to a temporary output directory so the pre-existing dirty `frontend/dist/index.html` was not changed by verification.
+
+## 10. M4 Resumption Verification
+
+| Check | Result |
+| --- | --- |
+| Full Python `unittest` discovery | Pass, 42 tests |
+| Python `compileall backend tests` | Pass |
+| Frontend Vite production build | Pass, 40 modules transformed |
+| FastAPI route registration with flag off | No `/api/broker/v1` routes registered |
+| FastAPI route registration with flag on | Broker listing routes registered |
+| Lint / typecheck | Not available; no scripts/configuration |
+| Database migrations / real Mongo integration | No migration framework or Mongo-backed M4 integration tests configured |
+
+The suite includes mocked API/use-case and tenant repository tests. It does not prove cross-tenant isolation against a running MongoDB instance. No commit was made because the repository-required lint, typecheck, and fresh/existing database migration checks cannot currently be run.
 

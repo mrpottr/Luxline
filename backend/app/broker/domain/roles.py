@@ -65,6 +65,7 @@ ROLE_PERMISSIONS: dict[BrokerRole, set[BrokerPermission]] = {
         BrokerPermission.LISTING_CREATE,
         BrokerPermission.LISTING_EDIT,
         BrokerPermission.LISTING_PUBLISH,
+        BrokerPermission.LISTING_DELETE,
         BrokerPermission.LEAD_VIEW_ALL,
         BrokerPermission.LEAD_VIEW_OWN,
         BrokerPermission.LEAD_ASSIGN,

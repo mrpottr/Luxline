@@ -2,9 +2,21 @@
 
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from urllib.parse import urlsplit
 from backend.app.broker.models.profile import BrokerStatus
 from backend.app.broker.domain.roles import BrokerRole
+from backend.app.models import ListingCategory
+
+
+def _validate_media_urls(values: list[str] | None) -> list[str] | None:
+    if values is None:
+        return None
+    for value in values:
+        parsed = urlsplit(value)
+        if len(value) > 2048 or parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Media references must be valid HTTPS URLs without embedded credentials")
+    return values
 
 
 class BrokerProfileUpdate(BaseModel):
@@ -140,3 +152,135 @@ class BrokerBranchOut(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Broker Listing Schemas ---
+
+class BrokerListingMediaInput(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+    media_type: str = Field(pattern="^(image|video|floor_plan)$")
+    sort_order: int = Field(ge=0, le=100)
+    alt_text: str = Field(default="", max_length=300)
+
+    @field_validator("url")
+    @classmethod
+    def media_url_must_use_https(cls, value: str) -> str:
+        _validate_media_urls([value])
+        return value
+
+    @model_validator(mode="after")
+    def images_need_alt_text(self):
+        if self.media_type in {"image", "floor_plan"} and not self.alt_text.strip():
+            raise ValueError("Image and floor plan media require descriptive alt text")
+        return self
+
+
+class BrokerListingMediaOut(BaseModel):
+    url: str
+    media_type: str
+    sort_order: int
+    alt_text: str = ""
+    moderation_state: str = "pending"
+
+class BrokerListingCreate(BaseModel):
+    title: str = Field(min_length=5, max_length=255)
+    description: str | None = Field(default=None, max_length=20000)
+    category: ListingCategory
+    price: float = Field(gt=0, allow_inf_nan=False)
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    location_country: str = Field(min_length=2, max_length=100)
+    location_city: str = Field(min_length=1, max_length=100)
+    location_address: str | None = Field(default=None, max_length=255)
+    assigned_agent_id: int | None = None
+    branch_id: int | None = None
+    owner_consent: bool = Field(default=False)
+    urgent_flag: bool = Field(default=False)
+    photos: list[str] = Field(default_factory=list, max_length=50)
+    media: list[BrokerListingMediaInput] = Field(default_factory=list, max_length=50)
+    attributes: dict[str, Any] = Field(default_factory=dict, max_length=100)
+
+    @field_validator("photos")
+    @classmethod
+    def photos_must_use_https(cls, values: list[str]) -> list[str]:
+        return _validate_media_urls(values) or []
+
+    @model_validator(mode="after")
+    def media_inputs_are_unambiguous(self):
+        if self.media and self.photos:
+            raise ValueError("Use either media or legacy photos, not both")
+        if len(self.media) + len(self.photos) > 50:
+            raise ValueError("At most 50 media items may be attached to a listing")
+        return self
+
+
+class BrokerListingUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=5, max_length=255)
+    description: str | None = Field(default=None, max_length=20000)
+    price: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
+    location_country: str | None = Field(default=None, min_length=2, max_length=100)
+    location_city: str | None = Field(default=None, min_length=1, max_length=100)
+    location_address: str | None = None
+    assigned_agent_id: int | None = None
+    branch_id: int | None = None
+    owner_consent: bool | None = None
+    urgent_flag: bool | None = None
+    photos: list[str] | None = Field(default=None, max_length=50)
+    media: list[BrokerListingMediaInput] | None = Field(default=None, max_length=50)
+    attributes: dict[str, Any] | None = Field(default=None, max_length=100)
+
+    @field_validator("photos")
+    @classmethod
+    def photos_must_use_https(cls, values: list[str] | None) -> list[str] | None:
+        return _validate_media_urls(values)
+
+    @model_validator(mode="after")
+    def media_inputs_are_unambiguous(self):
+        if self.media is not None and self.photos is not None:
+            raise ValueError("Use either media or legacy photos, not both")
+        if len(self.media or []) + len(self.photos or []) > 50:
+            raise ValueError("At most 50 media items may be attached to a listing")
+        return self
+
+
+class BrokerListingOut(BaseModel):
+    id: int
+    organization_id: int
+    listing_id: int
+    title: str
+    description: str = ""
+    category: str
+    price: float
+    currency: str
+    location_country: str
+    location_city: str
+    location_address: str | None = None
+    status: str
+    moderation_status: str
+    assigned_agent_id: int | None = None
+    branch_id: int | None = None
+    owner_consent: bool
+    quality_score: int
+    quality_rating: str
+    quality_suggestions: list[str] = Field(default_factory=list)
+    urgent_flag: bool
+    photos: list[str] = Field(default_factory=list)
+    media: list[BrokerListingMediaOut] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BulkImportRequest(BaseModel):
+    csv_content: str = Field(min_length=1, max_length=1_000_000)
+
+
+class BrokerListingRevisionOut(BaseModel):
+    id: int
+    organization_id: int
+    listing_id: int
+    version: int
+    actor_user_id: int
+    snapshot: dict[str, Any]
+    created_at: datetime

@@ -24,3 +24,4 @@ class BrokerBranch(BrokerBaseDocument):
     country = StringField(max_length=100)
     phone = StringField(max_length=50)
     email = StringField(max_length=255)
+

@@ -30,3 +30,4 @@ class BrokerProfileRepository(BaseTenantRepository[BrokerProfile]):
             profile.status = BrokerStatus.submitted
             profile.save()
         return profile
+

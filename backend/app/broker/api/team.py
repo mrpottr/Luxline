@@ -97,3 +97,4 @@ def remove_team_member(
 
     repo.soft_delete(member_id)
     return None
+

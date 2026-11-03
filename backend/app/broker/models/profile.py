@@ -43,3 +43,4 @@ class BrokerProfile(BrokerBaseDocument):
     languages = ListField(StringField(max_length=20), default=lambda: ["en"])
     service_areas = ListField(StringField(max_length=100), default=list)
     decision_notes = StringField()
+

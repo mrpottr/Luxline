@@ -4,6 +4,9 @@ import OnboardingScreen from './screens/OnboardingScreen';
 import PublicProfileEditor from './screens/PublicProfileEditor';
 import TeamScreen from './screens/TeamScreen';
 import BranchesScreen from './screens/BranchesScreen';
+import ListingsListScreen from './screens/ListingsListScreen';
+import ListingEditorScreen from './screens/ListingEditorScreen';
+import BulkImportScreen from './screens/BulkImportScreen';
 
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -27,6 +30,8 @@ export default function BrokerApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [brokerHealth, setBrokerHealth] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [listingEditor, setListingEditor] = useState(null);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   // If the feature flag is disabled, show disabled notice
   if (!IS_ENABLED) {
@@ -180,6 +185,26 @@ export default function BrokerApp() {
           )}
           {activeTab === 'branches' && (
             <BranchesScreen token={token} apiBase={BROKER_API_BASE} />
+          )}
+          {activeTab === 'listings' && !listingEditor && !showBulkImport && (
+            <ListingsListScreen
+              token={token}
+              apiBase={BROKER_API_BASE}
+              onNewListing={() => setListingEditor({})}
+              onEditListing={(listing) => setListingEditor(listing)}
+              onOpenImport={() => setShowBulkImport(true)}
+            />
+          )}
+          {activeTab === 'listings' && showBulkImport && (
+            <BulkImportScreen token={token} apiBase={BROKER_API_BASE} onDone={() => setShowBulkImport(false)} />
+          )}
+          {activeTab === 'listings' && listingEditor && (
+            <ListingEditorScreen
+              token={token}
+              apiBase={BROKER_API_BASE}
+              listing={listingEditor.listing_id ? listingEditor : null}
+              onDone={() => setListingEditor(null)}
+            />
           )}
           {activeTab === 'dashboard' && (
             <div className="broker-card">
