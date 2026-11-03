@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
-export default function TeamScreen({ token, apiBase }) {
+function TeamScreen({ token, apiBase }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -282,3 +283,4 @@ export default function TeamScreen({ token, apiBase }) {
   );
 }
 
+export default withBrokerTranslations(TeamScreen);

@@ -86,7 +86,7 @@ class MongoListingProvider:
             "quality_rating": extension.quality_rating,
             "quality_suggestions": extension.quality_suggestions,
             "urgent_flag": extension.urgent_flag,
-            "photos": [item.url for item in media],
+            "photos": [item.url for item in media if item.media_type == "image"],
             "media": media_items,
             "created_at": extension.created_at,
             "updated_at": extension.updated_at,

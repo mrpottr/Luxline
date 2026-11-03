@@ -6,7 +6,9 @@
   "main": "index.jsx",
   "scripts": {
     "start": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "node --test",
+    "lint": "eslint index.jsx components/HomePage.jsx components/broker --ext .jsx,.js,.mjs"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -14,6 +16,7 @@
     "react-router-dom": "^6.30.6"
   },
   "devDependencies": {
+    "eslint": "^10.14.0",
     "vite": "^5.4.21"
   }
 }

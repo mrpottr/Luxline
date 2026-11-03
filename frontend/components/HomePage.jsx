@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { canShowBrokerNavigation } from './broker/featureFlag.mjs';
 import './HomePage.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -144,14 +146,18 @@ async function callApi(url, options = {}, token = '') {
 }
 
 export default function HomePage() {
-  const [route, setRoute] = useState(parseRoute(window.location.pathname));
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  const route = useMemo(() => parseRoute(location.pathname), [location.pathname]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [heroIndex, setHeroIndex] = useState(0);
   const [token, setToken] = useState(localStorage.getItem('luxline_token') || '');
   const agentNavLinks = useMemo(() => {
-    const brokerAllowed = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true'
-      && getTokenRole(token) === 'business_account';
+    const brokerAllowed = canShowBrokerNavigation(
+      import.meta.env.VITE_BROKER_PANEL_ENABLED,
+      getTokenRole(token),
+    );
     return brokerAllowed
       ? [...AGENT_NAV_LINKS, { path: '/broker', label: 'Broker Portal' }]
       : AGENT_NAV_LINKS;
@@ -258,13 +264,10 @@ export default function HomePage() {
   }, [listings]);
 
   useEffect(() => {
-    const onPopState = () => setRoute(parseRoute(window.location.pathname));
     const onScroll = () => setIsScrolled(window.scrollY > 16);
-    window.addEventListener('popstate', onPopState);
     window.addEventListener('scroll', onScroll);
     onScroll();
     return () => {
-      window.removeEventListener('popstate', onPopState);
       window.removeEventListener('scroll', onScroll);
     };
   }, []);
@@ -503,9 +506,8 @@ export default function HomePage() {
 
   function navigate(path) {
     setIsNavOpen(false);
-    if (window.location.pathname === path) return;
-    window.history.pushState({}, '', path);
-    setRoute(parseRoute(path));
+    if (location.pathname === path) return;
+    routerNavigate(path);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 

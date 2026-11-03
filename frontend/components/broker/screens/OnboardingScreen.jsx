@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
-export default function OnboardingScreen({ token, apiBase, onProfileUpdated }) {
+function OnboardingScreen({ token, apiBase, onProfileUpdated }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -311,3 +312,4 @@ export default function OnboardingScreen({ token, apiBase, onProfileUpdated }) {
   );
 }
 
+export default withBrokerTranslations(OnboardingScreen);

@@ -14,7 +14,19 @@ Per rule: "You may touch shared code only at: route registry, navigation registr
 | `frontend/components/HomePage.jsx` | Navigation registry | M0 | Additive spread into `AGENT_NAV_LINKS`: added `{ path: '/broker', label: 'Broker Portal' }` conditionally if `VITE_BROKER_PANEL_ENABLED === 'true'`. Empty otherwise. |
 | `frontend/index.jsx` | Route registry | M4 seam correction | Mount `/broker/*` only when `VITE_BROKER_PANEL_ENABLED === 'true'`, so the off state has no broker route. |
 | `frontend/components/HomePage.jsx` | Navigation registry | M4 seam correction | Show Broker Portal only when the flag is on and the JWT role is `business_account`. |
-| `backend/.env.example` | Environment schema | M4 | Added optional broker flag, listing price floors/media/import limits, and bulk request limit examples with safe defaults. |
+| `frontend/components/HomePage.jsx` | Route/navigation registry | Found issue 2 | Derive page state from React Router location and navigate through the router so browser history stays synchronized. |
+| `backend/.env.example` | Environment schema | M4 | Added optional broker flag, listing price floors/media/import limits, rate limits, and mock upload provider settings with safe defaults. |
+| `backend/app/core/config.py` | Environment schema | Found issue 4 | Added optional monitoring service base URLs with localhost defaults. |
+| `docker-compose.yml` | Environment schema | Found issue 4 | Configured the backend container to use Prometheus/Grafana service DNS defaults while allowing explicit environment overrides. |
+| `backend/app/routers/admin.py` | Admin integration | Found issue 4 | Monitoring requests now use configured internal service URLs; response fields and status behavior are unchanged. |
+| `frontend/package.json` | Developer tooling | Found issue 3 | Added Node test and ESLint scripts; ESLint is a development dependency. |
+| `frontend/package-lock.json` | Developer tooling | Found issue 3 | Locked the ESLint development dependency. |
+| `backend/app/services/ingestion/service.py` | Existing worker correctness | Found issue 1 | Flush the newly added listing before assigning its generated ID to the ingestion row. |
+| `backend/app/broker/api/dependencies.py` | Broker authorization context | Found issue 6 | Resolve organization membership and assigned broker role through the application access use case. |
+| `backend/app/broker/api/router.py` | Route registry | Found issue 9 | Mounted broker media upload and signed-read routes under the feature-flagged broker router. |
+| `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | Found issue 7 | Added the broker namespace catalog for English, Sinhala, and Tamil with safe English fallback. |
+| `frontend/components/broker/i18n/withBrokerTranslations.jsx` | Broker UI seam | Found issue 7 | Routed broker screen text and accessible text attributes through the broker catalog. |
+| `frontend/eslint.config.mjs` | Developer tooling | Found issue 3 | Added focused lint checks for the frontend entry point, HomePage, and broker components. |
 
 ---
 

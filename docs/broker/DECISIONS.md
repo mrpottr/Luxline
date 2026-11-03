@@ -15,7 +15,7 @@
 
 - Rich media is represented by ordered HTTPS references plus broker-owned alt-text and moderation metadata. The existing marketplace media collection remains the source for public listing readers.
 - Editing media does not remove omitted base media because the shared legacy media model has no reversible soft-delete. The editor exposes ordering and metadata changes; omitted media remains attached until a compatible public-media lifecycle exists.
-- Bulk throttling uses a thread-safe in-process sliding window, keyed by organization and actor. A shared/distributed limiter adapter is still needed for multi-worker deployments.
+- Bulk throttling uses atomic MongoDB counters in `broker_bulk_rate_limits`, keyed by organization and actor. Fixed windows are shared by workers; requests at a window boundary may span adjacent windows.
 - Bulk idempotency keys are SHA-256-derived per row so the accepted request header length cannot overflow the broker listing key field, and retrying the same import can resume rows already created.
 - Broker sequence counters use the new `broker_sequences` collection. Initial counter values are seeded from the maximum existing ID per broker collection to avoid collisions with earlier records.
 

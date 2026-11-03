@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 import requests
 
 from backend.app.core.security import hash_password
+from backend.app.core.config import settings
 from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import AuditLog, Inquiry, Listing, ListingStatus, ModerationStatus, SavedSearch, User, UserRole
@@ -128,7 +129,7 @@ def get_monitoring_metrics(
 ):
     """Get raw Prometheus metrics for admin dashboard."""
     try:
-        response = requests.get("http://prometheus:9090/api/v1/query", params={"query": "luxline_requests_total"}, timeout=5)
+        response = requests.get(f"{settings.prometheus_internal_url}/api/v1/query", params={"query": "luxline_requests_total"}, timeout=5)
         return {"status": "ok", "data": response.json()}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -140,8 +141,8 @@ def get_monitoring_health(
 ):
     """Get overall system health metrics."""
     try:
-        prom_response = requests.get("http://prometheus:9090/-/healthy", timeout=5)
-        grafana_response = requests.get("http://grafana:3000/api/health", timeout=5)
+        prom_response = requests.get(f"{settings.prometheus_internal_url}/-/healthy", timeout=5)
+        grafana_response = requests.get(f"{settings.grafana_internal_url}/api/health", timeout=5)
         
         return {
             "prometheus": "healthy" if prom_response.status_code == 200 else "unhealthy",

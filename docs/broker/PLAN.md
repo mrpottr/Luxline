@@ -125,7 +125,7 @@ All modifications to existing files are strictly confined to safe seams and logg
   * Bulk import provides a validation dry-run before persistence.
   * Base listings remain compatible with existing public search.
 
-**Resumption status:** Core listing CRUD, publish checks, assignment scoping, CSV validation/import/export, revision snapshots, media metadata, process-local bulk throttling, docs, and mocked API/use-case tests are implemented. M4 remains active pending binary upload/storage scanning, broker-string i18n, and a shared multi-worker limiter. The opt-in MongoDB tenant-isolation test passed on a newly created, isolated broker_test_* database. No production upload or distributed throttle is claimed.
+**Resumption status:** Listing CRUD, publish checks, assignment scoping, CSV import/export, revision snapshots, media metadata and upload, MongoDB-backed bulk/upload throttling, broker namespace catalogs, docs, and API/use-case tests are implemented. Upload scanning and storage currently use the configured mock adapters. The opt-in MongoDB tenant, rate-limit, and signed-media tests passed against a newly created isolated broker_test_* database.
 
 ---
 

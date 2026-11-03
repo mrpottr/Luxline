@@ -13,6 +13,8 @@ from pymongo import MongoClient
 from pymongo.uri_parser import parse_uri
 
 from backend.app.broker.repositories.listing_repository import BrokerListingRepository
+from backend.app.broker.services.mongo_bulk_rate_limiter import MongoBulkRateLimiter
+from backend.app.broker.services.mongo_media_storage import MongoMockMediaStorage
 
 
 TEST_DATABASE_URL = os.getenv("BROKER_TEST_DATABASE_URL")
@@ -57,6 +59,38 @@ class TestBrokerMongoTenantIsolation(unittest.TestCase):
         self.assertIsNone(repository_b.update(created.id, quality_score=100))
         self.assertFalse(repository_b.soft_delete(created.id))
         self.assertEqual(repository_a.find_listing(listing_id).quality_score, 0)
+
+    def test_mongo_bulk_rate_limit_is_shared_and_tenant_keyed(self):
+        limiter = MongoBulkRateLimiter()
+        organization_id = int(uuid4().int % 2_000_000_000) + 1
+        user_id = int(uuid4().int % 2_000_000_000) + 1
+        self.assertTrue(limiter.consume(f"{organization_id}:{user_id}", maximum=1, window_seconds=60))
+        self.assertFalse(limiter.consume(f"{organization_id}:{user_id}", maximum=1, window_seconds=60))
+        self.assertTrue(limiter.consume(f"{organization_id + 1}:{user_id}", maximum=1, window_seconds=60))
+
+    def test_signed_media_is_readable_only_for_its_tenant(self):
+        storage = MongoMockMediaStorage("https://media.example.test")
+        stored = storage.store(
+            organization_id=81,
+            content=b"\x89PNG\r\n\x1a\ncontent",
+            content_type="image/png",
+            media_type="image",
+            alt_text="Building exterior",
+        )
+        asset = storage.read_signed(
+            asset_id=stored["asset_id"],
+            organization_id=81,
+            expires=stored["expires_at"],
+            token=stored["url"].split("token=")[-1],
+        )
+        self.assertIsNotNone(asset)
+        self.assertEqual(bytes(asset.content), b"\x89PNG\r\n\x1a\ncontent")
+        self.assertIsNone(storage.read_signed(
+            asset_id=stored["asset_id"],
+            organization_id=82,
+            expires=stored["expires_at"],
+            token=stored["url"].split("token=")[-1],
+        ))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { withBrokerTranslations } from './i18n/withBrokerTranslations';
+import { resolveBrokerLocale } from './i18n/catalog.mjs';
 import './BrokerApp.css';
 import OnboardingScreen from './screens/OnboardingScreen';
 import PublicProfileEditor from './screens/PublicProfileEditor';
@@ -24,9 +26,10 @@ function getRoleFromJwt(jwtToken) {
   }
 }
 
-export default function BrokerApp() {
+function BrokerApp() {
   const [token] = useState(localStorage.getItem('luxline_token') || '');
   const [role, setRole] = useState(getRoleFromJwt(token));
+  const [, setLocaleRefresh] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [brokerHealth, setBrokerHealth] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -170,6 +173,19 @@ export default function BrokerApp() {
           <div className="broker-user-pill">
             <span>Logged in as:</span>
             <span className="broker-role-tag">{role || 'Business User'}</span>
+            <label htmlFor="broker-locale" className="sr-only">Language</label>
+            <select
+              id="broker-locale"
+              value={resolveBrokerLocale(localStorage.getItem('luxline_language') || navigator.language)}
+              onChange={(event) => {
+                localStorage.setItem('luxline_language', event.target.value);
+                setLocaleRefresh((value) => value + 1);
+              }}
+            >
+              <option value="en">English</option>
+              <option value="si">Sinhala</option>
+              <option value="ta">Tamil</option>
+            </select>
           </div>
         </header>
 
@@ -230,3 +246,4 @@ export default function BrokerApp() {
   );
 }
 
+export default withBrokerTranslations(BrokerApp);

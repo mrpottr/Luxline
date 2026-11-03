@@ -12,17 +12,16 @@ from backend.app.broker.schemas import (
     BrokerListingCreate, BrokerListingOut, BrokerListingUpdate, BrokerListingRevisionOut, BulkImportRequest,
 )
 from backend.app.broker.services.listing_provider import MongoListingProvider
-from backend.app.broker.services.bulk_rate_limiter import InMemoryBulkRateLimiter
+from backend.app.broker.services.mongo_bulk_rate_limiter import broker_rate_limiter
 
 router = APIRouter(prefix="/listings", tags=["broker-listings"])
-bulk_rate_limiter = InMemoryBulkRateLimiter()
 
 
 def get_listing_use_cases(context: ListingContext = Depends(get_listing_context)) -> ListingUseCases:
     provider = MongoListingProvider(context.organization_id)
     return ListingUseCases(
         provider, context.permissions, listing_config, context.role, context.user.id,
-        bulk_rate_limiter, context.organization_id,
+        broker_rate_limiter, context.organization_id,
     )
 
 

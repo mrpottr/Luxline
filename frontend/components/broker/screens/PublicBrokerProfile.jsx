@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
-export default function PublicBrokerProfile({ orgId, apiBase }) {
+function PublicBrokerProfile({ orgId, apiBase }) {
   const [broker, setBroker] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -136,3 +137,4 @@ export default function PublicBrokerProfile({ orgId, apiBase }) {
   );
 }
 
+export default withBrokerTranslations(PublicBrokerProfile);

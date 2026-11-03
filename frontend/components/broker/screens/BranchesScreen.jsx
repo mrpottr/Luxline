@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
-export default function BranchesScreen({ token, apiBase }) {
+function BranchesScreen({ token, apiBase }) {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -189,3 +190,4 @@ export default function BranchesScreen({ token, apiBase }) {
   );
 }
 
+export default withBrokerTranslations(BranchesScreen);

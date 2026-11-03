@@ -14,8 +14,14 @@ def _validate_media_urls(values: list[str] | None) -> list[str] | None:
         return None
     for value in values:
         parsed = urlsplit(value)
-        if len(value) > 2048 or parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("Media references must be valid HTTPS URLs without embedded credentials")
+        local_media_url = (
+            parsed.scheme == "http"
+            and parsed.hostname in {"localhost", "127.0.0.1"}
+            and parsed.path.startswith("/api/broker/v1/media/")
+        )
+        secure_media_url = parsed.scheme == "https" and bool(parsed.hostname)
+        if len(value) > 2048 or not (secure_media_url or local_media_url) or parsed.username or parsed.password:
+            raise ValueError("Media references must be HTTPS URLs (or local signed mock URLs) without credentials")
     return values
 
 
@@ -181,6 +187,24 @@ class BrokerListingMediaOut(BaseModel):
     sort_order: int
     alt_text: str = ""
     moderation_state: str = "pending"
+
+
+class BrokerMediaUploadRequest(BaseModel):
+    content_base64: str = Field(min_length=1, max_length=11_200_000)
+    content_type: str = Field(pattern="^(image/jpeg|image/png|image/webp|application/pdf)$")
+    media_type: str = Field(pattern="^(image|floor_plan)$")
+    alt_text: str = Field(min_length=1, max_length=300)
+
+
+class BrokerMediaUploadOut(BaseModel):
+    asset_id: int
+    organization_id: int
+    url: str
+    content_type: str
+    media_type: str
+    alt_text: str
+    moderation_state: str
+    expires_at: int
 
 class BrokerListingCreate(BaseModel):
     title: str = Field(min_length=5, max_length=255)

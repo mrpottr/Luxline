@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
 function newIdempotencyKey() {
   return globalThis.crypto?.randomUUID?.() || `broker-listing-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export default function ListingEditorScreen({ token, apiBase, onDone, listing = null }) {
+function ListingEditorScreen({ token, apiBase, onDone, listing = null }) {
   const [saving, setSaving] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [uploadAltText, setUploadAltText] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -104,6 +107,52 @@ export default function ListingEditorScreen({ token, apiBase, onDone, listing = 
       setErrorMessage(err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleMediaUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMessage('Files must be 8 MiB or smaller.');
+      return;
+    }
+    setUploadingMedia(true);
+    setErrorMessage('');
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Unable to read this file.'));
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch(`${apiBase}/media/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          content_base64: dataUrl.split(',')[1],
+          content_type: file.type,
+          media_type: file.type === 'application/pdf' ? 'floor_plan' : 'image',
+          alt_text: uploadAltText,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || 'Media upload failed.');
+      setForm((current) => ({
+        ...current,
+        media: [...current.media, {
+          url: result.url,
+          media_type: result.media_type,
+          sort_order: current.media.length,
+          alt_text: result.alt_text,
+        }],
+      }));
+      setUploadAltText('');
+    } catch (error) {
+      setErrorMessage(error.message || 'Media upload failed.');
+    } finally {
+      setUploadingMedia(false);
     }
   }
 
@@ -255,6 +304,13 @@ export default function ListingEditorScreen({ token, apiBase, onDone, listing = 
             </div>
           ))}
           <button type="button" onClick={() => setForm({ ...form, media: [...form.media, { url: '', media_type: 'image', sort_order: form.media.length, alt_text: '' }] })}>Add media</button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+            <label htmlFor="broker-media-alt">Upload description</label>
+            <input id="broker-media-alt" value={uploadAltText} onChange={(event) => setUploadAltText(event.target.value)} maxLength={300} placeholder="Describe the image or floor plan" />
+            <label htmlFor="broker-media-upload">Upload image or PDF floor plan (max 8 MiB)</label>
+            <input id="broker-media-upload" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={uploadingMedia || !uploadAltText.trim()} onChange={handleMediaUpload} />
+            {uploadingMedia && <span role="status">Uploading and scanning…</span>}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#1a1d24', borderRadius: '6px' }}>
@@ -309,3 +365,4 @@ export default function ListingEditorScreen({ token, apiBase, onDone, listing = 
   );
 }
 
+export default withBrokerTranslations(ListingEditorScreen);

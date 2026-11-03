@@ -4,6 +4,13 @@ All routes are mounted under `/api/broker/v1` only when backend `BROKER_PANEL_EN
 
 ## Listings
 
+`POST /media/upload` accepts JSON fields `content_base64`, `content_type`, `media_type`, and `alt_text`. It allows JPEG, PNG, WebP, and PDF floor plans up to 8 MiB, checks file signatures, applies the broker upload rate limit, and returns an expiring signed media URL. `GET /media/{asset_id}` serves a valid signed URL. Uploaded bytes are stored in the additive `broker_media_assets` collection. `BROKER_MEDIA_STORAGE=mock_mongo` and `BROKER_VIRUS_SCANNER=mock` select the offline mock adapters. The mock scanner only detects the EICAR test marker; production use requires replacing it with a real scanning provider.
+
+| Method | Path | Permission | Purpose |
+| --- | --- | --- | --- |
+| POST | `/media/upload` | `broker:listing:create` | Validate, scan through the configured provider, store media, and return an expiring signed URL. |
+| GET | `/media/{asset_id}` | Signed URL | Serve an unexpired asset after HMAC and tenant-bound signature validation. |
+
 | Method | Path | Permission | Purpose |
 | --- | --- | --- | --- |
 | GET | `/listings/categories` | `broker:listing:view_own` | Return the category values supported by the existing marketplace listing model. |
@@ -22,7 +29,7 @@ CSV columns: `title,category,price,currency,location_country,location_city`. The
 
 Create and update request bodies are validated by Pydantic schemas in `backend/app/broker/schemas.py`. Listing bodies accept a `media` array of HTTPS references with `media_type` (`image`, `video`, or `floor_plan`), `sort_order`, and descriptive `alt_text` for image and floor-plan entries. The legacy `photos` field remains accepted as an image-reference compatibility input. New media metadata is stored on the broker extension and base media rows continue to serve existing marketplace readers. Omitted media is retained on edit because the existing shared `ListingMedia` model has no soft-delete support.
 
-Responses use the existing FastAPI JSON detail error format. List responses are arrays and include listing, media, and quality fields. A missing tenant-owned listing returns 404; insufficient permission returns 403; invalid fields or publish eligibility return 422. Bulk request throttling returns 429. The default in-memory limiter allows 10 bulk requests per actor and organization per minute; it is process-local and does not coordinate across multiple workers.
+Responses use the existing FastAPI JSON detail error format. List responses are arrays and include listing, media, and quality fields. A missing tenant-owned listing returns 404; insufficient permission returns 403; invalid fields or publish eligibility return 422. Bulk request throttling returns 429. MongoDB-backed counters allow the configured number of bulk requests per actor and organization in each fixed 60-second window and are shared across workers.
 
 ## Publish eligibility
 

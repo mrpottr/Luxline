@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
 function formatMoney(amount, currency) {
   try {
@@ -8,7 +9,7 @@ function formatMoney(amount, currency) {
   }
 }
 
-export default function ListingsListScreen({ token, apiBase, onNewListing, onEditListing, onOpenImport }) {
+function ListingsListScreen({ token, apiBase, onNewListing, onEditListing, onOpenImport }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
@@ -258,3 +259,4 @@ export default function ListingsListScreen({ token, apiBase, onNewListing, onEdi
   );
 }
 
+export default withBrokerTranslations(ListingsListScreen);

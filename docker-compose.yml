@@ -37,6 +37,8 @@ services:
       ADMIN_BOOTSTRAP_ENABLED: ${ADMIN_BOOTSTRAP_ENABLED:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      PROMETHEUS_INTERNAL_URL: ${PROMETHEUS_INTERNAL_URL:-http://prometheus:9090}
+      GRAFANA_INTERNAL_URL: ${GRAFANA_INTERNAL_URL:-http://grafana:3000}
     depends_on:
       db:
         condition: service_healthy

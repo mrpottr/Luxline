@@ -36,6 +36,8 @@ class Settings:
     admin_email: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "admin123")
     broker_panel_enabled: bool = os.getenv("BROKER_PANEL_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+    prometheus_internal_url: str = os.getenv("PROMETHEUS_INTERNAL_URL", "http://localhost:9090").rstrip("/")
+    grafana_internal_url: str = os.getenv("GRAFANA_INTERNAL_URL", "http://localhost:3000").rstrip("/")
 
 
 settings = Settings()

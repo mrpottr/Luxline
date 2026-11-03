@@ -7,6 +7,7 @@ Verifies:
 """
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 from fastapi import HTTPException
 
@@ -99,9 +100,11 @@ class TestBrokerFeatureFlagAndDependencies(unittest.TestCase):
             mock_user = MagicMock()
             mock_user.role = UserRole.standard_user
             mock_db = MagicMock()
+            mock_access = MagicMock()
+            mock_access.resolve.side_effect = PermissionError("Only broker members can access the panel")
 
             with self.assertRaises(HTTPException) as ctx:
-                get_broker_context(db=mock_db, current_user=mock_user, _flag=None)
+                get_broker_context(db=mock_db, current_user=mock_user, _flag=None, requested_organization_id=None, access=mock_access)
             self.assertEqual(ctx.exception.status_code, 403)
         finally:
             object.__setattr__(settings, "broker_panel_enabled", original_flag)
@@ -115,8 +118,14 @@ class TestBrokerFeatureFlagAndDependencies(unittest.TestCase):
             mock_user.email = "broker@example.com"
             mock_user.role = UserRole.business_account
             mock_db = MagicMock()
+            mock_access = MagicMock()
+            mock_access.resolve.return_value = SimpleNamespace(
+                organization_id=42,
+                role=BrokerRole.broker_owner,
+                permissions=set(BrokerPermission),
+            )
 
-            ctx = get_broker_context(db=mock_db, current_user=mock_user, _flag=None)
+            ctx = get_broker_context(db=mock_db, current_user=mock_user, _flag=None, requested_organization_id=None, access=mock_access)
             self.assertEqual(ctx.user.id, 42)
             self.assertEqual(ctx.role, BrokerRole.broker_owner)
             self.assertTrue(ctx.has_permission(BrokerPermission.LISTING_CREATE))

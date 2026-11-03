@@ -42,6 +42,7 @@ class IngestionWorker:
                             price=float(payload.get("price", 0)),
                         )
                         db.add(listing)
+                        db.flush(listing)
                         
                         row.status = "processed"
                         row.listing_id = listing.id

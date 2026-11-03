@@ -44,12 +44,20 @@ def _bulk_requests_per_minute() -> int:
         return 10
 
 
+def _media_uploads_per_minute() -> int:
+    try:
+        return min(120, max(1, int(os.getenv("BROKER_MEDIA_UPLOADS_PER_MINUTE", "20"))))
+    except ValueError:
+        return 20
+
+
 @dataclass(frozen=True)
 class BrokerListingConfig:
     price_floors: dict[str, dict[str, float]]
     minimum_media_count: int
     maximum_bulk_rows: int
     bulk_requests_per_minute: int
+    media_uploads_per_minute: int
     categories: tuple[str, ...]
 
 
@@ -58,5 +66,6 @@ listing_config = BrokerListingConfig(
     minimum_media_count=_minimum_media_count(),
     maximum_bulk_rows=_maximum_bulk_rows(),
     bulk_requests_per_minute=_bulk_requests_per_minute(),
+    media_uploads_per_minute=_media_uploads_per_minute(),
     categories=tuple(category.value for category in ListingCategory),
 )

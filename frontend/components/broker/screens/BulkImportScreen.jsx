@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
 function newIdempotencyKey() {
   return globalThis.crypto?.randomUUID?.() || `broker-import-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export default function BulkImportScreen({ token, apiBase, onDone }) {
+function BulkImportScreen({ token, apiBase, onDone }) {
   const [csvContent, setCsvContent] = useState('');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -94,3 +95,5 @@ export default function BulkImportScreen({ token, apiBase, onDone }) {
     </section>
   );
 }
+
+export default withBrokerTranslations(BulkImportScreen);

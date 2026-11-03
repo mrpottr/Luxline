@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
 
-export default function PublicProfileEditor({ token, apiBase }) {
+function PublicProfileEditor({ token, apiBase }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -189,3 +190,4 @@ export default function PublicProfileEditor({ token, apiBase }) {
   );
 }
 
+export default withBrokerTranslations(PublicProfileEditor);
