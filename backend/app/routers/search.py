@@ -1,9 +1,8 @@
 """Search endpoints for listings discovery and filter metadata."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.models import ListingCategory
 from backend.app.schemas import SearchResponse
 from backend.app.services.search_indexer.service import SearchService

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import './HomePage.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -84,6 +84,18 @@ function titleCase(value) {
 
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function getRoleFromJwt(jwtToken) {
+  try {
+    if (!jwtToken) return null;
+    const parts = jwtToken.split('.');
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    return payload.role || null;
+  } catch {
+    return null;
+  }
 }
 
 function pathForListing(id) {
@@ -418,7 +430,7 @@ export default function HomePage() {
           [adminOverview, auditLogs, moderationQueue, taxonomyTerms, fraudSignals] = await Promise.all([
             callApi(`${API_BASE}/admin/overview`, {}, token),
             callApi(`${API_BASE}/admin/audit-logs?limit=12`, {}, token),
-            callApi(`${API_BASE}/admin/moderation-queue`, {}, token),
+            callApi(`${API_BASE}/admin/moderation/queue`, {}, token),
             callApi(`${API_BASE}/admin/taxonomy?include_inactive=true`, {}, token).catch(() => []),
             callApi(`${API_BASE}/admin/fraud/signals`, {}, token).catch(() => [])
           ]);
@@ -850,7 +862,7 @@ export default function HomePage() {
     const doneLabel = action === 'approve' ? 'approved' : 'rejected';
     setAccountActionStatus(`${actionLabel} listing...`);
     try {
-      await callApi(`${API_BASE}/admin/listings/${listingId}/${action}`, {
+      await callApi(`${API_BASE}/admin/moderation/listings/${listingId}/${action}`, {
         method: 'POST'
       }, token);
       setAccountActionStatus(`Listing ${doneLabel}.`);
@@ -2129,11 +2141,12 @@ export default function HomePage() {
     }
   }
 
+  const currentAdmin = dashboardData.me?.role === 'super_admin' || getRoleFromJwt(token) === 'super_admin';
   const authNavLinks = token
     ? [
       { path: '/dashboard', label: 'Dashboard' },
       { path: '/account', label: 'My Account' },
-      { path: '/admin', label: 'Admin' }
+      ...(currentAdmin ? [{ path: '/admin', label: 'Admin' }] : [])
     ]
     : [{ path: '/dashboard', label: 'Log In or Sign Up' }];
 

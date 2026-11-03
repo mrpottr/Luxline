@@ -5,10 +5,9 @@ import hashlib
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
 from backend.app.core.config import settings
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import ApiKey, AuditLog, User, UserRole
 from backend.app.schemas import ApiKeyCreate, ApiKeyCreateResponse, ApiKeyOut
@@ -27,10 +26,10 @@ def list_api_keys(
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
     """List API keys owned by the current broker/admin account."""
-    query = db.query(ApiKey).order_by(ApiKey.created_at.desc())
+    query = ApiKey.objects
     if current_user.role != UserRole.super_admin:
-        query = query.filter(ApiKey.owner_user_id == current_user.id)
-    return query.limit(100).all()
+        query = query.filter(owner_user_id=current_user.id)
+    return list(query.order_by("-created_at").limit(100))
 
 
 @router.post("", response_model=ApiKeyCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -68,14 +67,15 @@ def revoke_api_key(
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
     """Revoke an API key without deleting its audit trail."""
-    query = db.query(ApiKey).filter(ApiKey.id == api_key_id)
+    query = ApiKey.objects(id=api_key_id)
     if current_user.role != UserRole.super_admin:
-        query = query.filter(ApiKey.owner_user_id == current_user.id)
+        query = query.filter(owner_user_id=current_user.id)
     api_key = query.first()
     if not api_key:
         raise HTTPException(status_code=404, detail="API key not found")
 
     api_key.revoked_at = datetime.utcnow()
+    db.add(api_key)
     db.add(
         AuditLog(
             actor_user_id=current_user.id,

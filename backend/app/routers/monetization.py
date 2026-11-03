@@ -3,9 +3,8 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import get_current_user, require_roles
 from backend.app.models import BlogPost, FeaturedPlacement, Listing, Subscription, SubscriptionStatus, User, UserRole
 from backend.app.schemas import BlogPostCreate, BlogPostOut, SubscriptionCreate, SubscriptionOut
@@ -51,11 +50,8 @@ def create_subscription(
 @router.get("/subscriptions/me", response_model=list[SubscriptionOut])
 def my_subscriptions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """List subscriptions owned by the authenticated user."""
-    return (
-        db.query(Subscription)
-        .filter(Subscription.business_user_id == current_user.id)
-        .order_by(Subscription.starts_at.desc())
-        .all()
+    return list(
+        Subscription.objects(business_user_id=current_user.id).order_by("-starts_at")
     )
 
 
@@ -66,14 +62,15 @@ def feature_listing(
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
     """Mark a listing as featured and create placement metadata if needed."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     if listing.seller_id != current_user.id and current_user.role != UserRole.super_admin:
         raise HTTPException(status_code=403, detail="Not your listing")
 
     listing.is_featured = True
-    placement = db.query(FeaturedPlacement).filter(FeaturedPlacement.listing_id == listing_id).first()
+    db.add(listing)
+    placement = FeaturedPlacement.objects(listing_id=listing_id).first()
     if not placement:
         placement = FeaturedPlacement(listing_id=listing_id, starts_at=datetime.utcnow(), priority=10)
         db.add(placement)
@@ -98,7 +95,7 @@ def create_blog_post(
 @router.get("/blog/posts", response_model=list[BlogPostOut])
 def list_blog_posts(db: Session = Depends(get_db), include_unpublished: bool = False):
     """List blog posts, optionally including unpublished drafts."""
-    query = db.query(BlogPost).order_by(BlogPost.created_at.desc())
+    query = BlogPost.objects
     if not include_unpublished:
-        query = query.filter(BlogPost.published.is_(True))
-    return query.limit(50).all()
+        query = query.filter(published=True)
+    return list(query.order_by("-created_at").limit(50))

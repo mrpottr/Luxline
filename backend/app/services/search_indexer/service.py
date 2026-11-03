@@ -1,8 +1,8 @@
-"""PostgreSQL-based search service."""
+"""MongoDB-backed search service."""
 
-from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session
+from mongoengine import Q
 
+from backend.app.db.session import Session
 from backend.app.models import Listing, ListingCategory, ListingStatus, ModerationStatus
 
 
@@ -23,76 +23,64 @@ class SearchService:
         limit: int = 25,
         offset: int = 0,
     ):
-        conditions = [Listing.status == ListingStatus.active, Listing.moderation_status == ModerationStatus.approved]
+        queryset = Listing.objects(
+            status=ListingStatus.active,
+            moderation_status=ModerationStatus.approved,
+        )
 
         if q:
-            # PostgreSQL FTS
-            tsquery = func.plainto_tsquery('english', q)
-            vector = func.to_tsvector('english', 
-                func.concat_ws(' ', 
-                    Listing.title, 
-                    Listing.description, 
-                    Listing.location_city, 
-                    Listing.location_country,
-                    Listing.make, 
-                    Listing.model
-                )
+            queryset = queryset.filter(
+                Q(title__icontains=q)
+                | Q(description__icontains=q)
+                | Q(location_city__icontains=q)
+                | Q(location_country__icontains=q)
+                | Q(make__icontains=q)
+                | Q(model__icontains=q)
             )
-            conditions.append(vector.op('@@')(tsquery))
 
         if category:
             if category == ListingCategory.car:
-                conditions.append(Listing.category.in_([ListingCategory.car, ListingCategory.hypercar]))
+                queryset = queryset.filter(category__in=[ListingCategory.car, ListingCategory.hypercar])
             else:
-                conditions.append(Listing.category == category)
+                queryset = queryset.filter(category=category)
         if min_price is not None:
-            conditions.append(Listing.price >= min_price)
+            queryset = queryset.filter(price__gte=min_price)
         if max_price is not None:
-            conditions.append(Listing.price <= max_price)
+            queryset = queryset.filter(price__lte=max_price)
         if year is not None:
-            conditions.append(Listing.year == year)
+            queryset = queryset.filter(year=year)
         if make:
-            conditions.append(Listing.make.ilike(f"%{make}%"))
+            queryset = queryset.filter(make__icontains=make)
         if model:
-            conditions.append(Listing.model.ilike(f"%{model}%"))
+            queryset = queryset.filter(model__icontains=model)
         if condition:
-            conditions.append(Listing.condition.ilike(f"%{condition}%"))
+            queryset = queryset.filter(condition__icontains=condition)
         if bedrooms is not None:
-            conditions.append(Listing.bedrooms == bedrooms)
+            queryset = queryset.filter(bedrooms=bedrooms)
         if map_bbox:
             min_lng, min_lat, max_lng, max_lat = map_bbox
-            conditions.append(Listing.longitude.between(min_lng, max_lng))
-            conditions.append(Listing.latitude.between(min_lat, max_lat))
+            queryset = queryset.filter(longitude__gte=min_lng, longitude__lte=max_lng)
+            queryset = queryset.filter(latitude__gte=min_lat, latitude__lte=max_lat)
 
-        query = (
-            db.query(Listing)
-            .filter(and_(*conditions))
-            .order_by(Listing.is_featured.desc(), Listing.published_at.desc(), Listing.created_at.desc())
-        )
-        total = query.count()
-        results = query.offset(offset).limit(limit).all()
+        ordered = queryset.order_by("-is_featured", "-published_at", "-created_at")
+        total = ordered.count()
+        results = list(ordered.skip(offset).limit(limit))
         return total, results
 
     @staticmethod
     def get_autocomplete_suggestions(db: Session, q: str, limit: int = 10):
-        wildcard = f"%{q}%"
         rows = (
-            db.query(Listing.make, Listing.model, Listing.location_city)
-            .filter(
-                or_(
-                    Listing.make.ilike(wildcard),
-                    Listing.model.ilike(wildcard),
-                    Listing.location_city.ilike(wildcard),
-                )
+            Listing.objects(
+                Q(make__icontains=q) | Q(model__icontains=q) | Q(location_city__icontains=q)
             )
+            .only("make", "model", "location_city")
             .limit(20)
-            .all()
         )
         suggestions = sorted(
             {
                 value
                 for row in rows
-                for value in [row[0], row[1], row[2]]
+                for value in [row.make, row.model, row.location_city]
                 if value and q.lower() in value.lower()
             }
         )
@@ -100,32 +88,27 @@ class SearchService:
 
     @staticmethod
     def get_facets(db: Session, category: ListingCategory | None = None):
-        conditions = [Listing.status == ListingStatus.active, Listing.moderation_status == ModerationStatus.approved]
+        queryset = Listing.objects(
+            status=ListingStatus.active,
+            moderation_status=ModerationStatus.approved,
+        )
         if category:
-            conditions.append(Listing.category == category)
+            queryset = queryset.filter(category=category)
 
-        category_counts = (
-            db.query(Listing.category, func.count(Listing.id))
-            .filter(and_(*conditions))
-            .group_by(Listing.category)
-            .all()
-        )
-        make_counts = (
-            db.query(Listing.make, func.count(Listing.id))
-            .filter(and_(*conditions), Listing.make.is_not(None))
-            .group_by(Listing.make)
-            .order_by(func.count(Listing.id).desc())
-            .limit(20)
-            .all()
-        )
-        condition_counts = (
-            db.query(Listing.condition, func.count(Listing.id))
-            .filter(and_(*conditions), Listing.condition.is_not(None))
-            .group_by(Listing.condition)
-            .all()
-        )
+        def _counts(field_name: str, max_items: int | None = None) -> list[dict]:
+            frequencies = queryset.item_frequencies(field_name)
+            items = [
+                (getattr(value, "value", value), count)
+                for value, count in frequencies.items()
+                if value is not None
+            ]
+            items.sort(key=lambda item: item[1], reverse=True)
+            if max_items is not None:
+                items = items[:max_items]
+            return [{"value": value, "count": count} for value, count in items]
+
         return {
-            "category": [{"value": row[0], "count": row[1]} for row in category_counts],
-            "make": [{"value": row[0], "count": row[1]} for row in make_counts],
-            "condition": [{"value": row[0], "count": row[1]} for row in condition_counts],
+            "category": _counts("category"),
+            "make": _counts("make", 20),
+            "condition": _counts("condition"),
         }

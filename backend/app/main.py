@@ -7,10 +7,8 @@ from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTEN
 import time
 
 from backend.app.core.config import settings
-from backend.app.db.base import Base
 from backend.app.db.bootstrap import ensure_default_admin
-from backend.app.db.schema import backfill_listing_subtype_rows, ensure_schema_compatibility
-from backend.app.db.session import SessionLocal, engine
+from backend.app.db.session import SessionLocal, ensure_database_exists, init_db
 from backend.app.routers import (
     admin,
     admin_cms,
@@ -119,9 +117,8 @@ def create_app() -> FastAPI:
         finally:
             ACTIVE_REQUESTS.labels(method=method, endpoint=endpoint).dec()
 
-    ensure_schema_compatibility(engine)
-    Base.metadata.create_all(bind=engine)
-    backfill_listing_subtype_rows(engine)
+    ensure_database_exists(settings.database_url)
+    init_db()
     with SessionLocal() as db:
         ensure_default_admin(db)
 

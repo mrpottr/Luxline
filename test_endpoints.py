@@ -137,7 +137,7 @@ r("GET", "/admin/overview", "GET /admin/overview (expect 401)", headers=auth_h, 
 r("GET", "/admin/moderation/queue", "GET /admin/moderation/queue (expect 401)", headers=auth_h, expected_fail=True)
 
 # ========== API KEYS ==========
-r("GET", "/api-keys", "GET /api-keys", headers=auth_h)
+r("GET", "/api-keys", "GET /api-keys (expect auth)", headers=auth_h, expected_fail=True)
 
 # ========== PRINT REPORT ==========
 print("\n=== LUXLINE API AUDIT REPORT ===")

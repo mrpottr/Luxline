@@ -1,9 +1,8 @@
 """Super-admin CMS authoring endpoints for Journal content."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import AuditLog, BlogPost, User, UserRole
 from backend.app.schemas import BlogPostCreate, BlogPostOut
@@ -18,7 +17,7 @@ def list_cms_posts(
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """List all Journal posts, including drafts."""
-    return db.query(BlogPost).order_by(BlogPost.created_at.desc()).limit(100).all()
+    return list(BlogPost.objects.order_by("-created_at").limit(100))
 
 
 @router.post("/posts", response_model=BlogPostOut, status_code=status.HTTP_201_CREATED)
@@ -28,7 +27,7 @@ def create_cms_post(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Create a Journal post from the admin CMS surface."""
-    existing = db.query(BlogPost).filter(BlogPost.slug == payload.slug).first()
+    existing = BlogPost.objects(slug=payload.slug).first()
     if existing:
         raise HTTPException(status_code=409, detail="Post slug already exists")
     post = BlogPost(**payload.model_dump())
@@ -54,11 +53,12 @@ def update_cms_post(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Replace editable Journal post fields."""
-    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
+    post = BlogPost.objects(id=post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     for key, value in payload.model_dump().items():
         setattr(post, key, value)
+    db.add(post)
     db.add(
         AuditLog(
             actor_user_id=admin.id,

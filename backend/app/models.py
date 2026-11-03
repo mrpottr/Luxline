@@ -1,24 +1,25 @@
-"""SQLAlchemy ORM models and enums for the Luxline domain."""
+"""MongoEngine documents and enums for the Luxline domain."""
 
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import (
-    JSON,
-    Boolean,
-    DateTime,
-    Enum as SQLEnum,
-    Float,
-    ForeignKey,
-    Integer,
-    Numeric,
-    String,
-    Text,
-    UniqueConstraint,
+from mongoengine import (
+    BooleanField,
+    DateTimeField,
+    DictField,
+    Document,
+    EnumField,
+    FloatField,
+    IntField,
+    ListField,
+    StringField,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.base import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.utcnow()
 
 
 class UserRole(str, Enum):
@@ -60,142 +61,210 @@ class SubscriptionStatus(str, Enum):
 
 
 class User(Base):
-    __tablename__ = "users"
+    meta = {
+        "collection": "users",
+        "indexes": ["email", "role", "created_at"],
+    }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    first_name: Mapped[str] = mapped_column(String(80), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(80), nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(32))
-    role: Mapped[UserRole] = mapped_column(SQLEnum(UserRole), nullable=False, index=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_verified_business: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    preferred_currency: Mapped[str] = mapped_column(String(8), default="USD", nullable=False)
-    preferred_language: Mapped[str] = mapped_column(String(8), default="en", nullable=False)
-    measurement_system: Mapped[str] = mapped_column(String(16), default="imperial", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    email = StringField(required=True, unique=True)
+    password_hash = StringField(required=True)
+    first_name = StringField(required=True, max_length=80)
+    last_name = StringField(required=True, max_length=80)
+    phone = StringField(max_length=32)
+    role = EnumField(UserRole, required=True, default=UserRole.standard_user)
+    is_active = BooleanField(default=True)
+    is_email_verified = BooleanField(default=False)
+    is_verified_business = BooleanField(default=False)
+    is_2fa_enabled = BooleanField(default=False)
+    preferred_currency = StringField(default="USD", max_length=8)
+    preferred_language = StringField(default="en", max_length=8)
+    measurement_system = StringField(default="imperial", max_length=16)
+    created_at = DateTimeField(default=_utcnow)
+    updated_at = DateTimeField(default=_utcnow)
 
-    agency_profile: Mapped["AgencyProfile | None"] = relationship(back_populates="owner", uselist=False)
-    team_members: Mapped[list["AgencyTeamMember"]] = relationship(back_populates="agency_owner")
-    listings: Mapped[list["Listing"]] = relationship(back_populates="seller")
-    saved_listings: Mapped[list["SavedListing"]] = relationship(back_populates="user")
-    saved_searches: Mapped[list["SavedSearch"]] = relationship(back_populates="user")
-    inquiries_sent: Mapped[list["Inquiry"]] = relationship(
-        back_populates="buyer", foreign_keys="Inquiry.buyer_id"
-    )
-    inquiries_received: Mapped[list["Inquiry"]] = relationship(
-        back_populates="seller", foreign_keys="Inquiry.seller_id"
-    )
-    subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="business_user")
-    audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="actor")
-    social_accounts: Mapped[list["SocialAccount"]] = relationship(back_populates="user")
-    two_factor_challenges: Mapped[list["TwoFactorChallenge"]] = relationship(back_populates="user")
-    email_verification_challenges: Mapped[list["EmailVerificationChallenge"]] = relationship(back_populates="user")
+    @property
+    def agency_profile(self):
+        return AgencyProfile.objects(owner_id=self.id).first()
+
+    @property
+    def team_members(self):
+        return list(AgencyTeamMember.objects(agency_owner_id=self.id))
+
+    @property
+    def listings(self):
+        return list(Listing.objects(seller_id=self.id))
+
+    @property
+    def saved_listings(self):
+        return list(SavedListing.objects(user_id=self.id))
+
+    @property
+    def saved_searches(self):
+        return list(SavedSearch.objects(user_id=self.id))
+
+    @property
+    def inquiries_sent(self):
+        return list(Inquiry.objects(buyer_id=self.id))
+
+    @property
+    def inquiries_received(self):
+        return list(Inquiry.objects(seller_id=self.id))
+
+    @property
+    def subscriptions(self):
+        return list(Subscription.objects(business_user_id=self.id))
+
+    @property
+    def audit_logs(self):
+        return list(AuditLog.objects(actor_user_id=self.id))
+
+    @property
+    def social_accounts(self):
+        return list(SocialAccount.objects(user_id=self.id))
+
+    @property
+    def two_factor_challenges(self):
+        return list(TwoFactorChallenge.objects(user_id=self.id))
+
+    @property
+    def email_verification_challenges(self):
+        return list(EmailVerificationChallenge.objects(user_id=self.id))
 
 
 class AgencyProfile(Base):
-    __tablename__ = "agency_profiles"
+    meta = {"collection": "agency_profiles", "indexes": ["owner_id"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    logo_url: Mapped[str | None] = mapped_column(String(500))
-    bio: Mapped[str | None] = mapped_column(Text)
-    website: Mapped[str | None] = mapped_column(String(255))
-    contact_email: Mapped[str | None] = mapped_column(String(255))
-    contact_phone: Mapped[str | None] = mapped_column(String(32))
-    address: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    owner_id = IntField(required=True, unique=True)
+    name = StringField(required=True, max_length=200)
+    logo_url = StringField(max_length=500)
+    bio = StringField()
+    website = StringField(max_length=255)
+    contact_email = StringField(max_length=255)
+    contact_phone = StringField(max_length=32)
+    address = StringField(max_length=255)
+    created_at = DateTimeField(default=_utcnow)
+    updated_at = DateTimeField(default=_utcnow)
 
-    owner: Mapped["User"] = relationship(back_populates="agency_profile")
-    team_members: Mapped[list["AgencyTeamMember"]] = relationship(back_populates="agency")
+    @property
+    def owner(self):
+        return User.objects(id=self.owner_id).first()
+
+    @property
+    def team_members(self):
+        return list(AgencyTeamMember.objects(agency_id=self.id))
 
 
 class AgencyTeamMember(Base):
-    __tablename__ = "agency_team_members"
+    meta = {"collection": "agency_team_members", "indexes": ["agency_id", "agency_owner_id"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    agency_id: Mapped[int] = mapped_column(ForeignKey("agency_profiles.id"), nullable=False, index=True)
-    agency_owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    title: Mapped[str | None] = mapped_column(String(120))
-    email: Mapped[str | None] = mapped_column(String(255))
-    phone: Mapped[str | None] = mapped_column(String(32))
+    agency_id = IntField(required=True)
+    agency_owner_id = IntField(required=True)
+    full_name = StringField(required=True, max_length=120)
+    title = StringField(max_length=120)
+    email = StringField(max_length=255)
+    phone = StringField(max_length=32)
 
-    agency: Mapped["AgencyProfile"] = relationship(back_populates="team_members")
-    agency_owner: Mapped["User"] = relationship(back_populates="team_members")
+    @property
+    def agency(self):
+        return AgencyProfile.objects(id=self.agency_id).first()
+
+    @property
+    def agency_owner(self):
+        return User.objects(id=self.agency_owner_id).first()
 
 
 class Listing(Base):
-    __tablename__ = "listings"
+    meta = {
+        "collection": "listings",
+        "indexes": [
+            "seller_id",
+            "agency_id",
+            "slug",
+            "category",
+            "status",
+            "moderation_status",
+            "location_country",
+            "location_city",
+            "price",
+            "year",
+            "make",
+            "model",
+            "condition",
+            "is_featured",
+            "created_at",
+        ],
+    }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    agency_id: Mapped[int | None] = mapped_column(ForeignKey("agency_profiles.id"), nullable=True, index=True)
-    title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    slug: Mapped[str] = mapped_column(String(300), unique=True, nullable=False, index=True)
-    description: Mapped[str | None] = mapped_column(Text)
-    category: Mapped[ListingCategory] = mapped_column(SQLEnum(ListingCategory), nullable=False, index=True)
-    status: Mapped[ListingStatus] = mapped_column(SQLEnum(ListingStatus), default=ListingStatus.draft, nullable=False)
-    moderation_status: Mapped[ModerationStatus] = mapped_column(
-        SQLEnum(ModerationStatus), default=ModerationStatus.pending, nullable=False, index=True
-    )
-    location_country: Mapped[str | None] = mapped_column(String(100), index=True)
-    location_city: Mapped[str | None] = mapped_column(String(100), index=True)
-    location_address: Mapped[str | None] = mapped_column(String(255))
-    latitude: Mapped[float | None] = mapped_column(Float)
-    longitude: Mapped[float | None] = mapped_column(Float)
-    currency: Mapped[str] = mapped_column(String(8), default="USD", nullable=False)
-    price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, index=True)
-    year: Mapped[int | None] = mapped_column(Integer, index=True)
-    make: Mapped[str | None] = mapped_column(String(120), index=True)
-    model: Mapped[str | None] = mapped_column(String(120), index=True)
-    condition: Mapped[str | None] = mapped_column(String(50), index=True)
-    bedrooms: Mapped[int | None] = mapped_column(Integer)
-    bathrooms: Mapped[float | None] = mapped_column(Float)
-    square_footage: Mapped[float | None] = mapped_column(Float)
-    mileage: Mapped[float | None] = mapped_column(Float)
-    draft_depth: Mapped[float | None] = mapped_column(Float)
-    beam_width: Mapped[float | None] = mapped_column(Float)
-    attributes: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    seller_id = IntField(required=True)
+    agency_id = IntField()
+    title = StringField(required=True, max_length=255)
+    slug = StringField(required=True, unique=True, max_length=300)
+    description = StringField()
+    category = EnumField(ListingCategory, required=True)
+    status = EnumField(ListingStatus, required=True, default=ListingStatus.draft)
+    moderation_status = EnumField(ModerationStatus, required=True, default=ModerationStatus.pending)
+    location_country = StringField(max_length=100)
+    location_city = StringField(max_length=100)
+    location_address = StringField(max_length=255)
+    latitude = FloatField()
+    longitude = FloatField()
+    currency = StringField(default="USD", max_length=8)
+    price = FloatField(required=True)
+    year = IntField()
+    make = StringField(max_length=120)
+    model = StringField(max_length=120)
+    condition = StringField(max_length=50)
+    bedrooms = IntField()
+    bathrooms = FloatField()
+    square_footage = FloatField()
+    mileage = FloatField()
+    draft_depth = FloatField()
+    beam_width = FloatField()
+    attributes = DictField(default=dict)
+    is_featured = BooleanField(default=False)
+    published_at = DateTimeField()
+    created_at = DateTimeField(default=_utcnow)
+    updated_at = DateTimeField(default=_utcnow)
 
-    seller: Mapped["User"] = relationship(back_populates="listings")
-    media_items: Mapped[list["ListingMedia"]] = relationship(back_populates="listing")
-    inquiries: Mapped[list["Inquiry"]] = relationship(back_populates="listing")
-    real_estate_details: Mapped["RealEstateListing | None"] = relationship(
-        back_populates="listing", uselist=False, cascade="all, delete-orphan"
-    )
-    vehicle_details: Mapped["VehicleListing | None"] = relationship(
-        back_populates="listing", uselist=False, cascade="all, delete-orphan"
-    )
-    vessel_aircraft_details: Mapped["VesselAircraftListing | None"] = relationship(
-        back_populates="listing", uselist=False, cascade="all, delete-orphan"
-    )
-    watch_jewelry_details: Mapped["WatchJewelryListing | None"] = relationship(
-        back_populates="listing", uselist=False, cascade="all, delete-orphan"
-    )
-    rental_terms: Mapped["RentalTerms | None"] = relationship(
-        back_populates="listing", uselist=False, cascade="all, delete-orphan"
-    )
+    @property
+    def seller(self):
+        return User.objects(id=self.seller_id).first()
+
+    @property
+    def agency(self):
+        return AgencyProfile.objects(id=self.agency_id).first() if self.agency_id else None
+
+    @property
+    def media_items(self):
+        return list(ListingMedia.objects(listing_id=self.id).order_by("sort_order", "id"))
+
+    @property
+    def inquiries(self):
+        return list(Inquiry.objects(listing_id=self.id))
+
+    @property
+    def real_estate_details(self):
+        return RealEstateListing.objects(listing_id=self.id).first()
+
+    @property
+    def vehicle_details(self):
+        return VehicleListing.objects(listing_id=self.id).first()
+
+    @property
+    def vessel_aircraft_details(self):
+        return VesselAircraftListing.objects(listing_id=self.id).first()
+
+    @property
+    def watch_jewelry_details(self):
+        return WatchJewelryListing.objects(listing_id=self.id).first()
+
+    @property
+    def rental_terms(self):
+        return RentalTerms.objects(listing_id=self.id).first()
 
     @property
     def details(self) -> dict:
-        """Return category-specific fields from additive subtype tables."""
+        """Return category-specific fields from additive subtype collections."""
         if self.real_estate_details:
             return self.real_estate_details.as_dict()
         if self.vehicle_details:
@@ -210,34 +279,40 @@ class Listing(Base):
 
 
 class TaxonomyTerm(Base):
-    __tablename__ = "taxonomy_terms"
-    __table_args__ = (UniqueConstraint("taxonomy", "parent_id", "slug", name="uq_taxonomy_parent_slug"),)
+    meta = {
+        "collection": "taxonomy_terms",
+        "indexes": [
+            "taxonomy",
+            "parent_id",
+            "is_active",
+            {"fields": ("taxonomy", "parent_id", "slug"), "unique": True},
+        ],
+    }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    taxonomy: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    parent_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
-    name: Mapped[str] = mapped_column(String(160), nullable=False)
-    slug: Mapped[str] = mapped_column(String(180), nullable=False)
-    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    taxonomy = StringField(required=True, max_length=50)
+    parent_id = IntField()
+    name = StringField(required=True, max_length=160)
+    slug = StringField(required=True, max_length=180)
+    metadata_json = DictField(default=dict)
+    is_active = BooleanField(default=True)
+    created_at = DateTimeField(default=_utcnow)
+    updated_at = DateTimeField(default=_utcnow)
 
 
-class RealEstateListing(Base):
-    __tablename__ = "listing_real_estate"
+class RealEstateListing(Document):
+    meta = {"collection": "listing_real_estate"}
 
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
-    area_value: Mapped[float | None] = mapped_column(Float)
-    area_unit: Mapped[str | None] = mapped_column(String(8))
-    acreage: Mapped[float | None] = mapped_column(Float)
-    bedrooms: Mapped[int | None] = mapped_column(Integer)
-    bathrooms: Mapped[float | None] = mapped_column(Float)
-    property_type_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True)
+    listing_id = IntField(primary_key=True)
+    area_value = FloatField()
+    area_unit = StringField(max_length=8)
+    acreage = FloatField()
+    bedrooms = IntField()
+    bathrooms = FloatField()
+    property_type_id = IntField()
 
-    listing: Mapped["Listing"] = relationship(back_populates="real_estate_details")
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
 
     def as_dict(self) -> dict:
         return {
@@ -250,21 +325,23 @@ class RealEstateListing(Base):
         }
 
 
-class VehicleListing(Base):
-    __tablename__ = "listing_vehicle"
+class VehicleListing(Document):
+    meta = {"collection": "listing_vehicle"}
 
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
-    make_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
-    model_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
-    make: Mapped[str | None] = mapped_column(String(120), index=True)
-    model: Mapped[str | None] = mapped_column(String(120), index=True)
-    year: Mapped[int | None] = mapped_column(Integer, index=True)
-    mileage_value: Mapped[float | None] = mapped_column(Float)
-    mileage_unit: Mapped[str | None] = mapped_column(String(8))
-    vin_ciphertext: Mapped[str | None] = mapped_column(Text)
-    steering_side: Mapped[str | None] = mapped_column(String(8))
+    listing_id = IntField(primary_key=True)
+    make_id = IntField()
+    model_id = IntField()
+    make = StringField(max_length=120)
+    model = StringField(max_length=120)
+    year = IntField()
+    mileage_value = FloatField()
+    mileage_unit = StringField(max_length=8)
+    vin_ciphertext = StringField()
+    steering_side = StringField(max_length=8)
 
-    listing: Mapped["Listing"] = relationship(back_populates="vehicle_details")
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
 
     def as_dict(self) -> dict:
         return {
@@ -279,20 +356,22 @@ class VehicleListing(Base):
         }
 
 
-class VesselAircraftListing(Base):
-    __tablename__ = "listing_vessel_aircraft"
+class VesselAircraftListing(Document):
+    meta = {"collection": "listing_vessel_aircraft"}
 
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
-    asset_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
-    builder_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
-    builder: Mapped[str | None] = mapped_column(String(120), index=True)
-    year: Mapped[int | None] = mapped_column(Integer, index=True)
-    length_value: Mapped[float | None] = mapped_column(Float)
-    length_unit: Mapped[str | None] = mapped_column(String(8))
-    cabins: Mapped[int | None] = mapped_column(Integer)
-    engine_hours: Mapped[int | None] = mapped_column(Integer)
+    listing_id = IntField(primary_key=True)
+    asset_type = StringField(required=True, max_length=16)
+    builder_id = IntField()
+    builder = StringField(max_length=120)
+    year = IntField()
+    length_value = FloatField()
+    length_unit = StringField(max_length=8)
+    cabins = IntField()
+    engine_hours = IntField()
 
-    listing: Mapped["Listing"] = relationship(back_populates="vessel_aircraft_details")
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
 
     def as_dict(self) -> dict:
         return {
@@ -307,20 +386,22 @@ class VesselAircraftListing(Base):
         }
 
 
-class WatchJewelryListing(Base):
-    __tablename__ = "listing_watch_jewelry"
+class WatchJewelryListing(Document):
+    meta = {"collection": "listing_watch_jewelry"}
 
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
-    asset_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
-    brand_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True, index=True)
-    brand: Mapped[str | None] = mapped_column(String(120), index=True)
-    reference_number: Mapped[str | None] = mapped_column(String(120), index=True)
-    case_material_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True)
-    movement_id: Mapped[int | None] = mapped_column(ForeignKey("taxonomy_terms.id"), nullable=True)
-    case_material: Mapped[str | None] = mapped_column(String(120))
-    movement: Mapped[str | None] = mapped_column(String(120))
+    listing_id = IntField(primary_key=True)
+    asset_type = StringField(required=True, max_length=16)
+    brand_id = IntField()
+    brand = StringField(max_length=120)
+    reference_number = StringField(max_length=120)
+    case_material_id = IntField()
+    movement_id = IntField()
+    case_material = StringField(max_length=120)
+    movement = StringField(max_length=120)
 
-    listing: Mapped["Listing"] = relationship(back_populates="watch_jewelry_details")
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
 
     def as_dict(self) -> dict:
         return {
@@ -335,16 +416,18 @@ class WatchJewelryListing(Base):
         }
 
 
-class RentalTerms(Base):
-    __tablename__ = "listing_rental_terms"
+class RentalTerms(Document):
+    meta = {"collection": "listing_rental_terms"}
 
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id", ondelete="CASCADE"), primary_key=True)
-    available_from: Mapped[datetime | None] = mapped_column(DateTime)
-    available_until: Mapped[datetime | None] = mapped_column(DateTime)
-    min_nights: Mapped[int | None] = mapped_column(Integer)
-    pricing_tiers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    listing_id = IntField(primary_key=True)
+    available_from = DateTimeField()
+    available_until = DateTimeField()
+    min_nights = IntField()
+    pricing_tiers = DictField(default=dict)
 
-    listing: Mapped["Listing"] = relationship(back_populates="rental_terms")
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
 
     def as_dict(self) -> dict:
         return {
@@ -356,271 +439,291 @@ class RentalTerms(Base):
 
 
 class ListingMedia(Base):
-    __tablename__ = "listing_media"
+    meta = {"collection": "listing_media", "indexes": ["listing_id"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
-    media_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    url: Mapped[str] = mapped_column(String(600), nullable=False)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    listing_id = IntField(required=True)
+    media_type = StringField(required=True, max_length=32)
+    url = StringField(required=True, max_length=600)
+    sort_order = IntField(default=0)
 
-    listing: Mapped["Listing"] = relationship(back_populates="media_items")
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
 
 
 class SavedListing(Base):
-    __tablename__ = "saved_listings"
-    __table_args__ = (UniqueConstraint("user_id", "listing_id", name="uq_saved_listing_user_listing"),)
+    meta = {
+        "collection": "saved_listings",
+        "indexes": [
+            "user_id",
+            "listing_id",
+            {"fields": ("user_id", "listing_id"), "unique": True},
+        ],
+    }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    user_id = IntField(required=True)
+    listing_id = IntField(required=True)
+    created_at = DateTimeField(default=_utcnow)
 
-    user: Mapped["User"] = relationship(back_populates="saved_listings")
+    @property
+    def user(self):
+        return User.objects(id=self.user_id).first()
+
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
 
 
 class SavedSearch(Base):
-    __tablename__ = "saved_searches"
+    meta = {"collection": "saved_searches", "indexes": ["user_id"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
-    filters: Mapped[dict] = mapped_column(JSON, nullable=False)
-    alert_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    user_id = IntField(required=True)
+    name = StringField(required=True, max_length=120)
+    filters = DictField(default=dict)
+    alert_enabled = BooleanField(default=True)
+    created_at = DateTimeField(default=_utcnow)
 
-    user: Mapped["User"] = relationship(back_populates="saved_searches")
+    @property
+    def user(self):
+        return User.objects(id=self.user_id).first()
 
 
 class AlertPreference(Base):
-    __tablename__ = "alert_preferences"
+    meta = {"collection": "alert_preferences", "indexes": ["user_id"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    channel: Mapped[str] = mapped_column(String(32), nullable=False)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    user_id = IntField(required=True)
+    channel = StringField(required=True, max_length=32)
+    enabled = BooleanField(default=True)
 
 
 class Inquiry(Base):
-    __tablename__ = "inquiries"
+    meta = {
+        "collection": "inquiries",
+        "indexes": ["listing_id", "buyer_id", "seller_id", "status", "created_at"],
+    }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
-    buyer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(32))
-    message: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(24), default="sent", nullable=False, index=True)
-    viewed_at: Mapped[datetime | None] = mapped_column(DateTime)
-    replied_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    listing_id = IntField(required=True)
+    buyer_id = IntField()
+    seller_id = IntField(required=True)
+    name = StringField(required=True, max_length=120)
+    email = StringField(required=True, max_length=255)
+    phone = StringField(max_length=32)
+    message = StringField(required=True)
+    status = StringField(default="sent", max_length=24)
+    viewed_at = DateTimeField()
+    replied_at = DateTimeField()
+    created_at = DateTimeField(default=_utcnow)
 
-    listing: Mapped["Listing"] = relationship(back_populates="inquiries")
-    buyer: Mapped["User"] = relationship(back_populates="inquiries_sent", foreign_keys=[buyer_id])
-    seller: Mapped["User"] = relationship(back_populates="inquiries_received", foreign_keys=[seller_id])
+    @property
+    def listing(self):
+        return Listing.objects(id=self.listing_id).first()
+
+    @property
+    def buyer(self):
+        return User.objects(id=self.buyer_id).first() if self.buyer_id else None
+
+    @property
+    def seller(self):
+        return User.objects(id=self.seller_id).first()
 
 
 class PhoneRevealEvent(Base):
-    __tablename__ = "phone_reveal_events"
+    meta = {"collection": "phone_reveal_events", "indexes": ["listing_id", "user_id"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    listing_id = IntField(required=True)
+    user_id = IntField()
+    created_at = DateTimeField(default=_utcnow)
 
 
 class Subscription(Base):
-    __tablename__ = "subscriptions"
+    meta = {"collection": "subscriptions", "indexes": ["business_user_id", "starts_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    business_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    plan_code: Mapped[str] = mapped_column(String(50), nullable=False)
-    status: Mapped[SubscriptionStatus] = mapped_column(
-        SQLEnum(SubscriptionStatus), default=SubscriptionStatus.trial, nullable=False
-    )
-    stripe_customer_id: Mapped[str | None] = mapped_column(String(100))
-    stripe_subscription_id: Mapped[str | None] = mapped_column(String(100))
-    starts_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    ends_at: Mapped[datetime | None] = mapped_column(DateTime)
+    business_user_id = IntField(required=True)
+    plan_code = StringField(required=True, max_length=50)
+    status = EnumField(SubscriptionStatus, required=True, default=SubscriptionStatus.trial)
+    stripe_customer_id = StringField(max_length=100)
+    stripe_subscription_id = StringField(max_length=100)
+    starts_at = DateTimeField(default=_utcnow)
+    ends_at = DateTimeField()
 
-    business_user: Mapped["User"] = relationship(back_populates="subscriptions")
+    @property
+    def business_user(self):
+        return User.objects(id=self.business_user_id).first()
 
 
 class FeaturedPlacement(Base):
-    __tablename__ = "featured_placements"
+    meta = {"collection": "featured_placements", "indexes": ["listing_id"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True, unique=True)
-    starts_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    ends_at: Mapped[datetime | None] = mapped_column(DateTime)
-    priority: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    listing_id = IntField(required=True, unique=True)
+    starts_at = DateTimeField(default=_utcnow)
+    ends_at = DateTimeField()
+    priority = IntField(default=100)
 
 
 class BlogPost(Base):
-    __tablename__ = "blog_posts"
+    meta = {"collection": "blog_posts", "indexes": ["slug", "published", "created_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    slug: Mapped[str] = mapped_column(String(300), unique=True, nullable=False, index=True)
-    excerpt: Mapped[str | None] = mapped_column(String(500))
-    content_markdown: Mapped[str] = mapped_column(Text, nullable=False)
-    cover_image_url: Mapped[str | None] = mapped_column(String(600))
-    podcast_embed_url: Mapped[str | None] = mapped_column(String(600))
-    published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    title = StringField(required=True, max_length=255)
+    slug = StringField(required=True, unique=True, max_length=300)
+    excerpt = StringField(max_length=500)
+    content_markdown = StringField(required=True)
+    cover_image_url = StringField(max_length=600)
+    podcast_embed_url = StringField(max_length=600)
+    published = BooleanField(default=False)
+    created_at = DateTimeField(default=_utcnow)
+    updated_at = DateTimeField(default=_utcnow)
 
 
 class AuditLog(Base):
-    __tablename__ = "audit_logs"
+    meta = {"collection": "audit_logs", "indexes": ["actor_user_id", "event_type", "created_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    event_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    actor_user_id = IntField()
+    event_type = StringField(required=True, max_length=80)
+    details = DictField(default=dict)
+    created_at = DateTimeField(default=_utcnow)
 
-    actor: Mapped["User | None"] = relationship(back_populates="audit_logs")
+    @property
+    def actor(self):
+        return User.objects(id=self.actor_user_id).first() if self.actor_user_id else None
 
 
 class ApiKey(Base):
-    __tablename__ = "api_keys"
+    meta = {"collection": "api_keys", "indexes": ["owner_user_id", "key_hash"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
-    key_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    scopes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime)
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    owner_user_id = IntField(required=True)
+    name = StringField(required=True, max_length=120)
+    key_hash = StringField(required=True, unique=True, max_length=128)
+    scopes = ListField(StringField(), default=list)
+    last_used_at = DateTimeField()
+    revoked_at = DateTimeField()
+    created_at = DateTimeField(default=_utcnow)
 
 
 class BrokerFeed(Base):
-    __tablename__ = "broker_feeds"
+    meta = {"collection": "broker_feeds", "indexes": ["owner_user_id", "status", "created_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
-    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    pull_url: Mapped[str | None] = mapped_column(String(600))
-    mapping_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    schedule_cron: Mapped[str | None] = mapped_column(String(80))
-    status: Mapped[str] = mapped_column(String(24), default="active", nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
+    owner_user_id = IntField(required=True)
+    name = StringField(required=True, max_length=120)
+    source_type = StringField(required=True, max_length=20)
+    pull_url = StringField(max_length=600)
+    mapping_json = DictField(default=dict)
+    schedule_cron = StringField(max_length=80)
+    status = StringField(default="active", max_length=24)
+    created_at = DateTimeField(default=_utcnow)
+    updated_at = DateTimeField(default=_utcnow)
 
 
 class IngestionJob(Base):
-    __tablename__ = "ingestion_jobs"
+    meta = {"collection": "ingestion_jobs", "indexes": ["owner_user_id", "feed_id", "status", "created_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    feed_id: Mapped[int | None] = mapped_column(ForeignKey("broker_feeds.id"), nullable=True, index=True)
-    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    status: Mapped[str] = mapped_column(String(24), default="queued", nullable=False, index=True)
-    total_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    success_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    failed_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    error_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+    owner_user_id = IntField(required=True)
+    feed_id = IntField()
+    source_type = StringField(required=True, max_length=20)
+    status = StringField(default="queued", max_length=24)
+    total_rows = IntField(default=0)
+    success_rows = IntField(default=0)
+    failed_rows = IntField(default=0)
+    error_json = DictField(default=dict)
+    created_at = DateTimeField(default=_utcnow)
+    started_at = DateTimeField()
+    finished_at = DateTimeField()
 
 
 class IngestionRow(Base):
-    __tablename__ = "ingestion_rows"
+    meta = {"collection": "ingestion_rows", "indexes": ["job_id", "external_id", "status"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    job_id: Mapped[int] = mapped_column(ForeignKey("ingestion_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
-    external_id: Mapped[str | None] = mapped_column(String(160), index=True)
-    row_payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    status: Mapped[str] = mapped_column(String(24), default="staged", nullable=False, index=True)
-    error_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    job_id = IntField(required=True)
+    external_id = StringField(max_length=160)
+    row_payload = DictField(default=dict)
+    status = StringField(default="staged", max_length=24)
+    error_json = DictField(default=dict)
+    created_at = DateTimeField(default=_utcnow)
 
 
 class ListingExternalId(Base):
-    __tablename__ = "listing_external_ids"
-    __table_args__ = (
-        UniqueConstraint("owner_user_id", "source", "external_id", name="uq_listing_external_owner_source_id"),
-    )
+    meta = {
+        "collection": "listing_external_ids",
+        "indexes": [
+            "owner_user_id",
+            "listing_id",
+            {"fields": ("owner_user_id", "source", "external_id"), "unique": True},
+        ],
+    }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    source: Mapped[str] = mapped_column(String(80), nullable=False)
-    external_id: Mapped[str] = mapped_column(String(160), nullable=False)
-    listing_id: Mapped[int] = mapped_column(ForeignKey("listings.id"), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    owner_user_id = IntField(required=True)
+    source = StringField(required=True, max_length=80)
+    external_id = StringField(required=True, max_length=160)
+    listing_id = IntField(required=True)
+    created_at = DateTimeField(default=_utcnow)
 
 
 class OutboxEvent(Base):
-    __tablename__ = "outbox_events"
+    meta = {"collection": "outbox_events", "indexes": ["aggregate_type", "aggregate_id", "event_type"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    aggregate_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    aggregate_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
-    event_type: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
-    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime)
+    aggregate_type = StringField(required=True, max_length=80)
+    aggregate_id = StringField(required=True, max_length=120)
+    event_type = StringField(required=True, max_length=120)
+    payload = DictField(default=dict)
+    created_at = DateTimeField(default=_utcnow)
+    published_at = DateTimeField()
 
 
 class FraudSignal(Base):
-    __tablename__ = "fraud_signals"
+    meta = {"collection": "fraud_signals", "indexes": ["listing_id", "user_id", "signal_type", "severity", "status", "created_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    listing_id: Mapped[int | None] = mapped_column(ForeignKey("listings.id"), nullable=True, index=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
-    signal_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    severity: Mapped[str] = mapped_column(String(20), default="medium", nullable=False, index=True)
-    status: Mapped[str] = mapped_column(String(24), default="open", nullable=False, index=True)
-    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    listing_id = IntField()
+    user_id = IntField()
+    signal_type = StringField(required=True, max_length=80)
+    severity = StringField(default="medium", max_length=20)
+    status = StringField(default="open", max_length=24)
+    details = DictField(default=dict)
+    created_at = DateTimeField(default=_utcnow)
+    resolved_at = DateTimeField()
 
 
 class SocialAccount(Base):
-    __tablename__ = "social_accounts"
-    __table_args__ = (UniqueConstraint("provider", "provider_user_id", name="uq_social_provider_user"),)
+    meta = {
+        "collection": "social_accounts",
+        "indexes": [
+            "user_id",
+            {"fields": ("provider", "provider_user_id"), "unique": True},
+        ],
+    }
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    provider: Mapped[str] = mapped_column(String(20), nullable=False)
-    provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    email: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    user_id = IntField(required=True)
+    provider = StringField(required=True, max_length=20)
+    provider_user_id = StringField(required=True, max_length=255)
+    email = StringField(max_length=255)
+    created_at = DateTimeField(default=_utcnow)
 
-    user: Mapped["User"] = relationship(back_populates="social_accounts")
+    @property
+    def user(self):
+        return User.objects(id=self.user_id).first()
 
 
 class TwoFactorChallenge(Base):
-    __tablename__ = "two_factor_challenges"
+    meta = {"collection": "two_factor_challenges", "indexes": ["user_id", "expires_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
-    consumed_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    user_id = IntField(required=True)
+    code_hash = StringField(required=True, max_length=128)
+    expires_at = DateTimeField(required=True)
+    consumed_at = DateTimeField()
+    created_at = DateTimeField(default=_utcnow)
 
-    user: Mapped["User"] = relationship(back_populates="two_factor_challenges")
+    @property
+    def user(self):
+        return User.objects(id=self.user_id).first()
 
 
 class EmailVerificationChallenge(Base):
-    __tablename__ = "email_verification_challenges"
+    meta = {"collection": "email_verification_challenges", "indexes": ["user_id", "expires_at"]}
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    code_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
-    consumed_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    user_id = IntField(required=True)
+    code_hash = StringField(required=True, max_length=128)
+    expires_at = DateTimeField(required=True)
+    consumed_at = DateTimeField()
+    created_at = DateTimeField(default=_utcnow)
 
-    user: Mapped["User"] = relationship(back_populates="email_verification_challenges")
+    @property
+    def user(self):
+        return User.objects(id=self.user_id).first()

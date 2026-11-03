@@ -1,9 +1,8 @@
 """Super-admin taxonomy management for brands, models, builders, and materials."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import AuditLog, TaxonomyTerm, User, UserRole
 from backend.app.schemas import TaxonomyTermCreate, TaxonomyTermOut, TaxonomyTermUpdate
@@ -21,12 +20,12 @@ def list_taxonomy_terms(
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """List taxonomy terms used by faceted listing metadata."""
-    query = db.query(TaxonomyTerm).order_by(TaxonomyTerm.taxonomy.asc(), TaxonomyTerm.name.asc())
+    query = TaxonomyTerm.objects
     if taxonomy:
-        query = query.filter(TaxonomyTerm.taxonomy == taxonomy.strip().lower())
+        query = query.filter(taxonomy=taxonomy.strip().lower())
     if not include_inactive:
-        query = query.filter(TaxonomyTerm.is_active.is_(True))
-    return query.limit(500).all()
+        query = query.filter(is_active=True)
+    return list(query.order_by("taxonomy", "name").limit(500))
 
 
 @router.post("", response_model=TaxonomyTermOut, status_code=status.HTTP_201_CREATED)
@@ -38,15 +37,11 @@ def create_taxonomy_term(
     """Create a taxonomy term and audit the change."""
     taxonomy = payload.taxonomy.strip().lower()
     slug = payload.slug or slugify(payload.name)
-    existing = (
-        db.query(TaxonomyTerm)
-        .filter(
-            TaxonomyTerm.taxonomy == taxonomy,
-            TaxonomyTerm.parent_id == payload.parent_id,
-            TaxonomyTerm.slug == slug,
-        )
-        .first()
-    )
+    existing = TaxonomyTerm.objects(
+        taxonomy=taxonomy,
+        parent_id=payload.parent_id,
+        slug=slug,
+    ).first()
     if existing:
         raise HTTPException(status_code=409, detail="Taxonomy term already exists")
 
@@ -80,7 +75,7 @@ def update_taxonomy_term(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Update or deactivate a taxonomy term."""
-    term = db.query(TaxonomyTerm).filter(TaxonomyTerm.id == term_id).first()
+    term = TaxonomyTerm.objects(id=term_id).first()
     if not term:
         raise HTTPException(status_code=404, detail="Taxonomy term not found")
 
@@ -90,6 +85,7 @@ def update_taxonomy_term(
             value = slugify(value)
         setattr(term, key, value)
 
+    db.add(term)
     db.add(
         AuditLog(
             actor_user_id=admin.id,

@@ -3,9 +3,8 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import AuditLog, FraudSignal, User, UserRole
 from backend.app.schemas import FraudSignalCreate, FraudSignalOut
@@ -21,10 +20,10 @@ def list_fraud_signals(
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """List fraud signals for manual review."""
-    query = db.query(FraudSignal).order_by(FraudSignal.created_at.desc())
+    query = FraudSignal.objects
     if status_filter:
-        query = query.filter(FraudSignal.status == status_filter)
-    return query.limit(200).all()
+        query = query.filter(status=status_filter)
+    return list(query.order_by("-created_at").limit(200))
 
 
 @router.post("/signals", response_model=FraudSignalOut, status_code=status.HTTP_201_CREATED)
@@ -56,11 +55,12 @@ def resolve_fraud_signal(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Resolve a fraud signal after review."""
-    signal = db.query(FraudSignal).filter(FraudSignal.id == signal_id).first()
+    signal = FraudSignal.objects(id=signal_id).first()
     if not signal:
         raise HTTPException(status_code=404, detail="Fraud signal not found")
     signal.status = "resolved"
     signal.resolved_at = datetime.utcnow()
+    db.add(signal)
     db.add(
         AuditLog(
             actor_user_id=admin.id,

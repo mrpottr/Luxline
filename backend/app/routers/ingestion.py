@@ -6,9 +6,8 @@ import json
 import xml.etree.ElementTree as ET
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import BrokerFeed, IngestionJob, IngestionRow, OutboxEvent, User, UserRole
 from backend.app.schemas import BrokerFeedCreate, BrokerFeedOut, IngestionJobCreate, IngestionJobOut, IngestionRowOut
@@ -71,10 +70,10 @@ def list_feeds(
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
     """List feed definitions visible to the current broker/admin."""
-    query = db.query(BrokerFeed).order_by(BrokerFeed.created_at.desc())
+    query = BrokerFeed.objects
     if current_user.role != UserRole.super_admin:
-        query = query.filter(BrokerFeed.owner_user_id == current_user.id)
-    return query.limit(100).all()
+        query = query.filter(owner_user_id=current_user.id)
+    return list(query.order_by("-created_at").limit(100))
 
 
 @router.post("/jobs", response_model=IngestionJobOut, status_code=status.HTTP_201_CREATED)
@@ -143,10 +142,10 @@ def list_ingestion_jobs(
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
     """List recent ingestion jobs."""
-    query = db.query(IngestionJob).order_by(IngestionJob.created_at.desc())
+    query = IngestionJob.objects
     if current_user.role != UserRole.super_admin:
-        query = query.filter(IngestionJob.owner_user_id == current_user.id)
-    return query.limit(100).all()
+        query = query.filter(owner_user_id=current_user.id)
+    return list(query.order_by("-created_at").limit(100))
 
 
 @router.get("/jobs/{job_id}/rows", response_model=list[IngestionRowOut])
@@ -156,10 +155,10 @@ def list_ingestion_rows(
     current_user: User = Depends(require_roles(UserRole.business_account, UserRole.super_admin)),
 ):
     """Return staged row details and validation errors for a job."""
-    job_query = db.query(IngestionJob).filter(IngestionJob.id == job_id)
+    job_query = IngestionJob.objects(id=job_id)
     if current_user.role != UserRole.super_admin:
-        job_query = job_query.filter(IngestionJob.owner_user_id == current_user.id)
+        job_query = job_query.filter(owner_user_id=current_user.id)
     if not job_query.first():
         raise HTTPException(status_code=404, detail="Ingestion job not found")
-    return db.query(IngestionRow).filter(IngestionRow.job_id == job_id).order_by(IngestionRow.id.asc()).limit(500).all()
+    return list(IngestionRow.objects(job_id=job_id).order_by("id").limit(500))
 

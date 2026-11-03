@@ -1,9 +1,9 @@
 """Threaded messaging between buyers and sellers."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from mongoengine import Q
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import get_current_user
 from backend.app.models import Inquiry, Listing, User
 from backend.app.schemas import InquiryCreate, InquiryOut
@@ -18,11 +18,9 @@ def get_my_messages(
     current_user: User = Depends(get_current_user),
 ):
     """Get all messages/inquiries where the user is either buyer or seller."""
-    return (
-        db.query(Inquiry)
-        .filter((Inquiry.buyer_id == current_user.id) | (Inquiry.seller_id == current_user.id))
-        .order_by(Inquiry.created_at.desc())
-        .all()
+    return list(
+        Inquiry.objects(Q(buyer_id=current_user.id) | Q(seller_id=current_user.id))
+        .order_by("-created_at")
     )
 
 
@@ -32,11 +30,9 @@ def get_message_threads(
     current_user: User = Depends(get_current_user),
 ):
     """Return grouped message threads by listing, with most recent message per listing."""
-    inquiries = (
-        db.query(Inquiry)
-        .filter((Inquiry.buyer_id == current_user.id) | (Inquiry.seller_id == current_user.id))
-        .order_by(Inquiry.listing_id.asc(), Inquiry.created_at.desc())
-        .all()
+    inquiries = list(
+        Inquiry.objects(Q(buyer_id=current_user.id) | Q(seller_id=current_user.id))
+        .order_by("listing_id", "-created_at")
     )
     # Group by listing_id (acts as thread key)
     threads: dict[int, dict] = {}
@@ -67,7 +63,7 @@ def send_message_to_seller(
     current_user: User = Depends(get_current_user),
 ):
     """Send an inquiry/message to a listing seller."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     if listing.seller_id == current_user.id:

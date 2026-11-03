@@ -14,7 +14,7 @@ The current application is a full-stack luxury marketplace prototype with:
 
 - React and Vite frontend for browsing luxury inventory and account workflows.
 - FastAPI backend with versioned API routes under `/api/v1`.
-- PostgreSQL database models for users, agencies, listings, listing media, inquiries, saved searches, saved listings, subscriptions, blog posts, and audit logs.
+- MongoDB database models for users, agencies, listings, listing media, inquiries, saved searches, saved listings, subscriptions, blog posts, and audit logs.
 - Authentication, registration, email verification, role-based access, and optional two-factor verification flows.
 - Buyer features such as listing search, saved assets, saved searches, inquiries, account preferences, and alert preferences.
 - Seller and business account features for creating listings and importing listing feeds.
@@ -38,8 +38,8 @@ The planned AI-powered workflow is:
 ## Tech Stack
 
 - Frontend: React 18, Vite, React Router
-- Backend: FastAPI, SQLAlchemy, Pydantic
-- Database: PostgreSQL
+- Backend: FastAPI, MongoEngine, Pydantic
+- Database: MongoDB
 - Authentication: JWT-based auth with role controls
 - Monitoring: Prometheus and Grafana
 - Deployment/dev orchestration: Docker Compose
@@ -52,7 +52,7 @@ When run through Docker Compose, the project includes:
 
 - `frontend`: serves the React application on port `5173`
 - `backend`: serves the FastAPI application on port `8000`
-- `db`: PostgreSQL database on port `5432`
+- `db`: MongoDB database on port `27017`
 - `prometheus`: metrics collection on port `9090`
 - `grafana`: dashboards on port `3000`
 
@@ -75,6 +75,7 @@ Useful local URLs:
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:8000/health`
 - API docs: `http://localhost:8000/docs`
+- MongoDB: `mongodb://localhost:27017/luxline`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
 

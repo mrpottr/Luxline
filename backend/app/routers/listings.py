@@ -6,10 +6,8 @@ import io
 import xml.etree.ElementTree as ET
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import get_current_user, get_optional_current_user, require_roles
 from backend.app.models import (
     AgencyProfile,
@@ -46,7 +44,7 @@ def ensure_unique_slug(db: Session, base_slug: str) -> str:
     """Generate a unique listing slug by appending an incrementing suffix."""
     slug = base_slug
     counter = 2
-    while db.query(Listing).filter(Listing.slug == slug).first():
+    while Listing.objects(slug=slug).first():
         slug = f"{base_slug}-{counter}"
         counter += 1
     return slug
@@ -75,7 +73,7 @@ def create_listing(
     """Create a new listing for eligible seller roles and attach media items."""
     agency_id = None
     if current_user.role == UserRole.business_account:
-        agency = db.query(AgencyProfile).filter(AgencyProfile.owner_id == current_user.id).first()
+        agency = AgencyProfile.objects(owner_id=current_user.id).first()
         agency_id = agency.id if agency else None
 
     base_slug = slugify(f"{payload.category.value}-{payload.make or ''}-{payload.model or ''}-{payload.title}")
@@ -141,32 +139,29 @@ def list_listings(
     max_price: float | None = Query(default=None),
 ):
     """List public approved listings with optional filter parameters."""
-    conditions = []
+    query = Listing.objects(
+        status=ListingStatus.active,
+        moderation_status=ModerationStatus.approved,
+    )
     if category:
         try:
             parsed_category = ListingCategory(category.strip().lower())
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid category")
         if parsed_category == ListingCategory.car:
-            conditions.append(Listing.category.in_([ListingCategory.car, ListingCategory.hypercar]))
+            query = query.filter(category__in=[ListingCategory.car, ListingCategory.hypercar])
         else:
-            conditions.append(Listing.category == parsed_category)
+            query = query.filter(category=parsed_category)
     if status_filter:
-        conditions.append(Listing.status == status_filter)
+        query = query.filter(status=status_filter)
     if city:
-        conditions.append(Listing.location_city.ilike(f"%{city}%"))
+        query = query.filter(location_city__icontains=city)
     if min_price is not None:
-        conditions.append(Listing.price >= min_price)
+        query = query.filter(price__gte=min_price)
     if max_price is not None:
-        conditions.append(Listing.price <= max_price)
+        query = query.filter(price__lte=max_price)
 
-    conditions.append(Listing.status == ListingStatus.active)
-    conditions.append(Listing.moderation_status == ModerationStatus.approved)
-
-    query = db.query(Listing).order_by(Listing.is_featured.desc(), Listing.created_at.desc())
-    if conditions:
-        query = query.filter(and_(*conditions))
-    return query.limit(100).all()
+    return list(query.order_by("-is_featured", "-created_at").limit(100))
 
 
 @router.get("/{listing_id}", response_model=ListingOut)
@@ -176,7 +171,7 @@ def get_listing(
     current_user: User | None = Depends(get_optional_current_user),
 ):
     """Return a listing by ID, including owner/admin preview of unpublished listings."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     can_view_unpublished = bool(current_user and (current_user.role == UserRole.super_admin or listing.seller_id == current_user.id))
@@ -195,7 +190,7 @@ def update_listing(
     current_user: User = Depends(get_current_user),
 ):
     """Update a listing for its owner or an admin user."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     if current_user.role != UserRole.super_admin and listing.seller_id != current_user.id:
@@ -212,6 +207,7 @@ def update_listing(
     if listing.status == ListingStatus.active and not listing.published_at:
         listing.published_at = datetime.utcnow()
     InventoryService.queue_listing_changed(db, listing, "updated")
+    db.add(listing)
     db.commit()
     db.refresh(listing)
     return listing
@@ -224,14 +220,10 @@ def save_listing(
     current_user: User = Depends(get_current_user),
 ):
     """Save a listing to the authenticated user's saved-listings collection."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    existing = (
-        db.query(SavedListing)
-        .filter(SavedListing.user_id == current_user.id, SavedListing.listing_id == listing_id)
-        .first()
-    )
+    existing = SavedListing.objects(user_id=current_user.id, listing_id=listing_id).first()
     if existing:
         return {"message": "Already saved"}
     row = SavedListing(user_id=current_user.id, listing_id=listing_id)

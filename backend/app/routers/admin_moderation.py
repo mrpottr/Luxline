@@ -1,9 +1,8 @@
 """Administrative endpoints for listing moderation."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import AuditLog, Listing, ModerationStatus, User, UserRole
 from backend.app.schemas import ListingOut
@@ -18,11 +17,8 @@ def moderation_queue(
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Return pending listings requiring moderation review."""
-    return (
-        db.query(Listing)
-        .filter(Listing.moderation_status == ModerationStatus.pending)
-        .order_by(Listing.created_at.asc())
-        .all()
+    return list(
+        Listing.objects(moderation_status=ModerationStatus.pending).order_by("created_at")
     )
 
 
@@ -33,10 +29,11 @@ def approve_listing(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Approve a listing in moderation and record an audit event."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     listing.moderation_status = ModerationStatus.approved
+    db.add(listing)
     db.add(AuditLog(actor_user_id=admin.id, event_type="listing.approved", details={"listing_id": listing_id}))
     db.commit()
     db.refresh(listing)
@@ -50,10 +47,11 @@ def reject_listing(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Reject a listing in moderation and record an audit event."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     listing.moderation_status = ModerationStatus.rejected
+    db.add(listing)
     db.add(AuditLog(actor_user_id=admin.id, event_type="listing.rejected", details={"listing_id": listing_id}))
     db.commit()
     db.refresh(listing)

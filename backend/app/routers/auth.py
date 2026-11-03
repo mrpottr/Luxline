@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
 from backend.app.core.config import settings
 from backend.app.core.email import send_email_otp
@@ -16,7 +15,7 @@ from backend.app.core.security import (
     verify_otp,
     verify_password,
 )
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import get_current_user as get_current_user_dep
 from backend.app.models import EmailVerificationChallenge, SocialAccount, TwoFactorChallenge, User, UserRole
 from backend.app.schemas import (
@@ -56,7 +55,7 @@ def _create_email_verification(db: Session, user: User) -> tuple[EmailVerificati
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user account with role-based defaults."""
-    existing = db.query(User).filter(User.email == payload.email).first()
+    existing = User.objects(email=payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -89,7 +88,7 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate a user and return either a token or a 2FA challenge."""
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = User.objects(email=payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
@@ -129,11 +128,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/email/verify", response_model=TokenResponse)
 def verify_email(payload: EmailVerificationRequest, db: Session = Depends(get_db)):
     """Verify a user's email address using a one-time code."""
-    challenge = (
-        db.query(EmailVerificationChallenge)
-        .filter(EmailVerificationChallenge.id == payload.verification_id)
-        .first()
-    )
+    challenge = EmailVerificationChallenge.objects(id=payload.verification_id).first()
     if not challenge:
         raise HTTPException(status_code=404, detail="Verification request not found")
     if challenge.consumed_at:
@@ -143,13 +138,14 @@ def verify_email(payload: EmailVerificationRequest, db: Session = Depends(get_db
     if not verify_otp(payload.code, challenge.code_hash):
         raise HTTPException(status_code=401, detail="Invalid verification code")
 
-    user = db.query(User).filter(User.id == challenge.user_id).first()
+    user = User.objects(id=challenge.user_id).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User is not active")
 
     user.is_email_verified = True
     challenge.consumed_at = datetime.utcnow()
-    db.commit()
+    user.save()
+    challenge.save()
 
     token = create_access_token(str(user.id), extra_claims={"role": user.role.value})
     return TokenResponse(access_token=token)
@@ -158,7 +154,7 @@ def verify_email(payload: EmailVerificationRequest, db: Session = Depends(get_db
 @router.post("/email/resend", response_model=RegisterResponse)
 def resend_email_verification(payload: EmailVerificationResendRequest, db: Session = Depends(get_db)):
     """Resend a verification code to an unverified user email."""
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = User.objects(email=payload.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.is_email_verified:
@@ -178,7 +174,7 @@ def resend_email_verification(payload: EmailVerificationResendRequest, db: Sessi
 @router.post("/2fa/verify", response_model=TokenResponse)
 def verify_two_factor(payload: TwoFactorVerifyRequest, db: Session = Depends(get_db)):
     """Validate a 2FA challenge code and issue an access token."""
-    challenge = db.query(TwoFactorChallenge).filter(TwoFactorChallenge.id == payload.challenge_id).first()
+    challenge = TwoFactorChallenge.objects(id=payload.challenge_id).first()
     if not challenge:
         raise HTTPException(status_code=404, detail="2FA challenge not found")
     if challenge.consumed_at:
@@ -188,12 +184,12 @@ def verify_two_factor(payload: TwoFactorVerifyRequest, db: Session = Depends(get
     if not verify_otp(payload.code, challenge.code_hash):
         raise HTTPException(status_code=401, detail="Invalid verification code")
 
-    user = db.query(User).filter(User.id == challenge.user_id).first()
+    user = User.objects(id=challenge.user_id).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User is not active")
 
     challenge.consumed_at = datetime.utcnow()
-    db.commit()
+    challenge.save()
 
     token = create_access_token(str(user.id), extra_claims={"role": user.role.value})
     return TokenResponse(access_token=token)
@@ -209,22 +205,18 @@ def social_login(payload: SocialLoginRequest, db: Session = Depends(get_db)):
     # Placeholder identity extraction; replace with provider token verification in production.
     provider_user_id = hashlib.sha256(payload.id_token.encode("utf-8")).hexdigest()
 
-    social = (
-        db.query(SocialAccount)
-        .filter(SocialAccount.provider == provider, SocialAccount.provider_user_id == provider_user_id)
-        .first()
-    )
+    social = SocialAccount.objects(provider=provider, provider_user_id=provider_user_id).first()
     if social:
-        user = db.query(User).filter(User.id == social.user_id, User.is_active.is_(True)).first()
+        user = User.objects(id=social.user_id, is_active=True).first()
         if not user:
             raise HTTPException(status_code=401, detail="Linked user unavailable")
         if not user.is_email_verified:
             user.is_email_verified = True
-            db.commit()
+            user.save()
         token = create_access_token(str(user.id), extra_claims={"role": user.role.value})
         return TokenResponse(access_token=token)
 
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = User.objects(email=payload.email).first()
     if not user:
         user = User(
             email=payload.email,

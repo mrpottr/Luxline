@@ -1,7 +1,6 @@
 """Inventory business logic and helpers."""
 
-from sqlalchemy.orm import Session
-
+from backend.app.db.session import Session
 from backend.app.models import (
     Listing,
     ListingCategory,

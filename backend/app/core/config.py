@@ -17,7 +17,7 @@ class Settings:
     app_name: str = os.getenv("APP_NAME", "Luxline API")
     app_env: str = os.getenv("APP_ENV", "development")
     app_version: str = os.getenv("APP_VERSION", "1.0.0")
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./luxline.db")
+    database_url: str = os.getenv("DATABASE_URL", "mongodb://localhost:27017/luxline")
     jwt_secret: str = os.getenv("JWT_SECRET", "change-me-in-production")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     jwt_exp_minutes: int = int(os.getenv("JWT_EXP_MINUTES", "120"))

@@ -1,11 +1,9 @@
 """Health and root metadata endpoints."""
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from backend.app.core.config import settings
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_database, get_db
 
 
 router = APIRouter(tags=["health"])
@@ -20,5 +18,5 @@ def root():
 @router.get("/health")
 def health(db: Session = Depends(get_db)):
     """Verify API and database availability with a lightweight DB ping."""
-    db.execute(text("SELECT 1"))
+    get_database().command("ping")
     return {"status": "ok"}

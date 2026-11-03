@@ -1,9 +1,8 @@
 """Lead-routing and seller-contact endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import get_current_user, get_optional_current_user
 from backend.app.models import Inquiry, Listing, User
 from backend.app.schemas import InquiryCreate, InquiryOut
@@ -21,7 +20,7 @@ def contact_seller(
     current_user: User | None = Depends(get_optional_current_user),
 ):
     """Create an inquiry for a listing and record lead-routing audit metadata."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
 
@@ -36,7 +35,7 @@ def reveal_phone_number(
     current_user: User | None = Depends(get_optional_current_user),
 ):
     """Return seller phone details for a listing and track the reveal event."""
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = Listing.objects(id=listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     
@@ -57,7 +56,7 @@ def mark_inquiry_viewed(
     current_user: User = Depends(get_current_user),
 ):
     """Mark an inbound inquiry as viewed by the seller."""
-    inquiry = db.query(Inquiry).filter(Inquiry.id == inquiry_id).first()
+    inquiry = Inquiry.objects(id=inquiry_id).first()
     if not inquiry:
         raise HTTPException(status_code=404, detail="Inquiry not found")
     if inquiry.seller_id != current_user.id:
@@ -73,7 +72,7 @@ def mark_inquiry_replied(
     current_user: User = Depends(get_current_user),
 ):
     """Mark an inbound inquiry as replied by the seller."""
-    inquiry = db.query(Inquiry).filter(Inquiry.id == inquiry_id).first()
+    inquiry = Inquiry.objects(id=inquiry_id).first()
     if not inquiry:
         raise HTTPException(status_code=404, detail="Inquiry not found")
     if inquiry.seller_id != current_user.id:

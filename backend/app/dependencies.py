@@ -3,10 +3,9 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
-from sqlalchemy.orm import Session
 
 from backend.app.core.security import decode_access_token
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.models import User, UserRole
 
 
@@ -27,7 +26,7 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     except (InvalidTokenError, ValueError, TypeError):
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = User.objects(id=user_id).first()
     if not user or not user.is_active:
         raise credentials_exception
     return user
@@ -43,7 +42,7 @@ def get_optional_current_user(db: Session = Depends(get_db), token: str | None =
     except (InvalidTokenError, ValueError, TypeError):
         return None
 
-    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+    user = User.objects(id=user_id, is_active=True).first()
     return user
 
 

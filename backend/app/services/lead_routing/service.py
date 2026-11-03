@@ -1,8 +1,8 @@
 """Lead routing and inquiry management service."""
 
 from datetime import datetime
-from sqlalchemy.orm import Session
 
+from backend.app.db.session import Session
 from backend.app.models import AuditLog, Inquiry, Listing, PhoneRevealEvent
 
 
@@ -39,7 +39,7 @@ class LeadRoutingService:
 
     @staticmethod
     def get_inbox_for_seller(db: Session, seller_id: int):
-        return db.query(Inquiry).filter(Inquiry.seller_id == seller_id).order_by(Inquiry.created_at.desc()).all()
+        return list(Inquiry.objects(seller_id=seller_id).order_by("-created_at"))
 
     @staticmethod
     def mark_inquiry_viewed(db: Session, inquiry: Inquiry):
@@ -47,7 +47,7 @@ class LeadRoutingService:
             inquiry.status = "viewed"
         if not inquiry.viewed_at:
             inquiry.viewed_at = datetime.utcnow()
-        db.commit()
+        inquiry.save()
         db.refresh(inquiry)
         return inquiry
 
@@ -57,6 +57,7 @@ class LeadRoutingService:
         inquiry.status = "replied"
         inquiry.viewed_at = inquiry.viewed_at or now
         inquiry.replied_at = now
+        inquiry.save()
         db.add(
             AuditLog(
                 actor_user_id=user_id,

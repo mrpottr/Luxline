@@ -65,7 +65,7 @@ Recommended runtime components:
 
 ```text
 FastAPI API Gateway / BFF
-PostgreSQL + PostGIS          source of truth, transactional writes
+MongoDB                       source of truth, transactional writes
 OpenSearch                    faceted search and autocomplete
 Redis                         sessions, rate limits, short-lived FX cache
 Kafka or Redpanda             outbox events, ingestion jobs, search indexing
@@ -88,7 +88,7 @@ Use Class Table Inheritance:
 - `listing_attributes` or `attributes_jsonb` is allowed only for low-value, non-faceted extras.
 - Search uses a denormalized projection in OpenSearch, not live multi-table joins.
 
-### SQLAlchemy model sketch
+### Legacy relational model sketch (superseded by MongoDB/MongoEngine)
 
 ```python
 from datetime import datetime
@@ -353,7 +353,7 @@ Super admin flow:
 
 ## 4. Search and Filtering
 
-PostgreSQL remains the system of record. OpenSearch is the query engine.
+MongoDB remains the system of record. OpenSearch is the query engine.
 
 Index one document per listing:
 
@@ -385,7 +385,7 @@ Search flow:
 
 1. API validates filters and maps category-specific filters into OpenSearch DSL.
 2. OpenSearch returns IDs, counts, and facet buckets.
-3. API loads listing cards from Redis projection cache or PostgreSQL read replica.
+3. API loads listing cards from Redis projection cache or MongoDB replica set.
 4. Sort order: paid placement, quality score, recency, then deterministic ID.
 5. Search events are logged asynchronously for ranking and alert matching.
 

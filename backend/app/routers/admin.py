@@ -1,11 +1,10 @@
 """Administrative endpoints for moderation and account operations."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 import requests
 
 from backend.app.core.security import hash_password
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.dependencies import require_roles
 from backend.app.models import AuditLog, Inquiry, Listing, ListingStatus, ModerationStatus, SavedSearch, User, UserRole
 from backend.app.schemas import AdminOverviewOut, AdminResetPasswordRequest, AuditLogOut, ListingOut, UserOut, UserRoleUpdate
@@ -20,7 +19,7 @@ def admin_list_users(
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """List all platform users for admin management."""
-    return db.query(User).order_by(User.created_at.desc()).all()
+    return list(User.objects.order_by("-created_at"))
 
 
 @router.get("/overview", response_model=AdminOverviewOut)
@@ -29,21 +28,19 @@ def admin_overview(
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Return account-page metrics and recent administrative activity for admins."""
-    recent_audit_logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(10).all()
+    recent_audit_logs = list(AuditLog.objects.order_by("-created_at").limit(10))
     return {
-        "total_users": db.query(User).count(),
-        "active_users": db.query(User).filter(User.is_active.is_(True)).count(),
-        "suspended_users": db.query(User).filter(User.is_active.is_(False)).count(),
-        "total_listings": db.query(Listing).count(),
-        "active_listings": db.query(Listing).filter(Listing.status == ListingStatus.active).count(),
-        "pending_listings": db.query(Listing).filter(Listing.moderation_status == ModerationStatus.pending).count(),
-        "pending_business_verifications": (
-            db.query(User)
-            .filter(User.role == UserRole.business_account, User.is_verified_business.is_(False))
-            .count()
-        ),
-        "inquiry_count": db.query(Inquiry).count(),
-        "saved_search_count": db.query(SavedSearch).count(),
+        "total_users": User.objects.count(),
+        "active_users": User.objects(is_active=True).count(),
+        "suspended_users": User.objects(is_active=False).count(),
+        "total_listings": Listing.objects.count(),
+        "active_listings": Listing.objects(status=ListingStatus.active).count(),
+        "pending_listings": Listing.objects(moderation_status=ModerationStatus.pending).count(),
+        "pending_business_verifications": User.objects(
+            role=UserRole.business_account, is_verified_business=False
+        ).count(),
+        "inquiry_count": Inquiry.objects.count(),
+        "saved_search_count": SavedSearch.objects.count(),
         "recent_audit_logs": recent_audit_logs,
     }
 
@@ -55,7 +52,7 @@ def audit_logs(
     _admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Return recent audit logs for privileged account activity views."""
-    return db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).all()
+    return list(AuditLog.objects.order_by("-created_at").limit(limit))
 
 
 
@@ -66,10 +63,11 @@ def verify_business_user(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Mark a user as business-verified and record the admin action."""
-    user = db.query(User).filter(User.id == user_id).first()
+    user = User.objects(id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.is_verified_business = True
+    db.add(user)
     db.add(AuditLog(actor_user_id=admin.id, event_type="user.business_verified", details={"user_id": user_id}))
     db.commit()
     db.refresh(user)
@@ -84,10 +82,11 @@ def admin_reset_password(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Reset a user password as an admin operation and audit the change."""
-    user = db.query(User).filter(User.id == user_id).first()
+    user = User.objects(id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.password_hash = hash_password(payload.new_password)
+    db.add(user)
     db.add(AuditLog(actor_user_id=admin.id, event_type="user.password_reset", details={"user_id": user_id}))
     db.commit()
     db.refresh(user)
@@ -102,7 +101,7 @@ def admin_update_user_role(
     admin: User = Depends(require_roles(UserRole.super_admin)),
 ):
     """Change a user's role (excluding super-admin assignment) and audit it."""
-    user = db.query(User).filter(User.id == user_id).first()
+    user = User.objects(id=user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if payload.role == UserRole.super_admin:
@@ -110,6 +109,7 @@ def admin_update_user_role(
 
     user.role = payload.role
     user.is_2fa_enabled = payload.role == UserRole.business_account
+    db.add(user)
     db.add(
         AuditLog(
             actor_user_id=admin.id,

@@ -1,9 +1,8 @@
 """Motor vehicles specific listing endpoints."""
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.session import Session, get_db
 from backend.app.models import ListingCategory, ListingStatus
 from backend.app.routers.listings import list_listings
 from backend.app.schemas import ListingOut
