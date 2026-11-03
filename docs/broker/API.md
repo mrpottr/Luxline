@@ -36,3 +36,21 @@ Responses use the existing FastAPI JSON detail error format. List responses are 
 Publishing requires an approved broker profile, an active existing subscription, a licence keyed by the listing country, owner consent, the configured minimum media count, a configured price floor for the listing category and currency if present, and quality score of at least 50.
 
 Broker-specific optional environment settings are listed in `backend/.env.example`. The default panel flag is off. MongoEngine creates broker collections on first write; this repository has no migration framework or rollback command.
+
+## Leads and inbox
+
+All endpoints below require `BROKER_PANEL_ENABLED=true` and a bearer token. Broker endpoints also require an active broker membership, an approved broker profile, and the listed use-case permission. Broker leads and supporting records are stored in tenant-owned `broker_leads`, `broker_activities`, `broker_messages`, and `broker_templates` collections. List endpoints accept bounded pagination and the documented stage/sort filters. Create endpoints require an `Idempotency-Key` header (8–128 characters). Messaging is throttled by `BROKER_MESSAGES_PER_MINUTE` using shared Mongo-backed counters.
+
+| Method | Path | Permission / identity | Purpose |
+| --- | --- | --- | --- |
+| GET | `/leads` | `broker:lead:view_all` or assigned agent `broker:lead:view_own` | Import seller-directed inquiries for this organization's listings, then list by `stage`, `limit`, `offset`, and `sort` (`created_at`, `score`, optionally prefixed with `-`). |
+| PATCH | `/leads/{lead_id}/stage` | Lead view permission | Set stage to `new`, `contacted`, `qualified`, `lost`, or `closed`. |
+| POST | `/leads/{lead_id}/assign` | `broker:lead:assign` | Assign to an active member in the selected organization. |
+| PATCH | `/leads/{lead_id}/spam` | `broker:lead:view_all` | Set or clear the manual spam flag. |
+| GET, POST | `/leads/{lead_id}/activities` | Lead view permission | Read with `limit`/`offset` or add a note, task, or reminder. Create requires an idempotency key. |
+| GET, POST | `/inbox/{lead_id}/messages` | `broker:lead:view_all` or assigned agent `broker:lead:view_own`; send additionally requires `broker:lead:message` | Read with `limit`/`offset` or add a buyer-visible message. Send requires a buyer account linked to the inquiry and an idempotency key. Stored messages are available to the authenticated buyer through the buyer inbox; no external messaging provider is called. |
+| GET, POST | `/inbox/templates` | `broker:lead:message` | List or create organization-scoped saved replies. Create requires an idempotency key. Supported UI variables are `{buyer_name}` and `{listing_id}`. |
+| GET | `/buyer/inbox?organization_id={id}` | Authenticated buyer | List only consented leads whose `buyer_id` matches the current user, scoped to the selected organization; supports `limit`/`offset`. |
+| GET, POST | `/buyer/inbox/{lead_id}/messages?organization_id={id}` | Authenticated buyer owning that lead | Read with `limit`/`offset` or add messages to the buyer's own conversation. Create requires an idempotency key and is rate-limited. |
+
+Lead assignment uses listing assignment first, a future routing-rule match second, least-loaded active-agent selection third, and manager/owner queue last. Lead scores are deterministic and use contact/account completeness and inquiry text length only. Inquiry sync happens on the lead-list request, not in a background job. A seller-directed public inquiry is treated as consent to receive a response from that broker; anonymous inquiries do not support platform messaging because no authenticated buyer identity exists.

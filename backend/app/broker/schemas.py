@@ -206,6 +206,104 @@ class BrokerMediaUploadOut(BaseModel):
     moderation_state: str
     expires_at: int
 
+
+class BrokerLeadOut(BaseModel):
+    id: int
+    organization_id: int
+    inquiry_id: int
+    listing_id: int
+    buyer_id: int | None = None
+    buyer_name: str
+    buyer_email: str
+    buyer_phone: str | None = None
+    initial_message: str
+    source: str
+    stage: str
+    score: int
+    assigned_member_id: int | None = None
+    first_response_at: datetime | None = None
+    first_response_seconds: int | None = None
+    spam_flag: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerLeadStageUpdate(BaseModel):
+    stage: str = Field(pattern="^(new|contacted|qualified|lost|closed)$")
+
+
+class BrokerLeadSpamUpdate(BaseModel):
+    spam_flag: bool
+
+
+class BrokerLeadAssign(BaseModel):
+    member_user_id: int = Field(ge=1)
+
+
+class BrokerLeadActivityCreate(BaseModel):
+    activity_type: str = Field(pattern="^(note|task|reminder)$")
+    body: str = Field(min_length=1, max_length=5000)
+    due_at: datetime | None = None
+
+
+class BrokerLeadActivityOut(BaseModel):
+    id: int
+    organization_id: int
+    lead_id: int
+    actor_user_id: int
+    activity_type: str
+    body: str
+    due_at: datetime | None = None
+    completed_at: datetime | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerLeadBuyerOut(BaseModel):
+    id: int
+    organization_id: int
+    listing_id: int
+    stage: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerMessageCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=5000)
+
+
+class BrokerMessageOut(BaseModel):
+    id: int
+    organization_id: int
+    lead_id: int
+    sender_type: str
+    sender_user_id: int | None = None
+    body: str
+    delivery_status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerReplyTemplateCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class BrokerReplyTemplateOut(BaseModel):
+    id: int
+    organization_id: int
+    title: str
+    body: str
+    created_by: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 class BrokerListingCreate(BaseModel):
     title: str = Field(min_length=5, max_length=255)
     description: str | None = Field(default=None, max_length=20000)

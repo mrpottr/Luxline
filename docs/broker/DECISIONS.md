@@ -19,3 +19,13 @@
 - Bulk idempotency keys are SHA-256-derived per row so the accepted request header length cannot overflow the broker listing key field, and retrying the same import can resume rows already created.
 - Broker sequence counters use the new `broker_sequences` collection. Initial counter values are seeded from the maximum existing ID per broker collection to avoid collisions with earlier records.
 
+## M5: Leads, assignment, and conversations
+
+- Preserve the existing inquiry endpoint and response contract. Broker lead refresh imports legacy inquiries only when the referenced listing has a live `broker_listings` extension for the selected organization; `organization_id` is applied on broker lead and conversation repositories.
+- A submitted seller inquiry is treated as buyer intent to receive a response through that seller's broker organization. Buyer conversations are only available to authenticated account holders whose `buyer_id` matches; anonymous inquiries remain in the broker pipeline but cannot receive a platform-account message.
+- Lead assignment follows listing agent, matching routing rule, least-loaded active agent (stable user ID tie-break), then active manager/owner queue. No routing-rule store exists yet, so the rule-match input remains an empty seam for M9.
+- Lead scores use only submitted phone presence, account presence, and inquiry message length, with a deterministic 0–100 score. Spam labels are manual in M5; no opaque classifier is introduced.
+- Broker messages are stored as Luxline conversation records with `delivery_status=stored`; no external messaging vendor is called. Replies are available to the authenticated buyer through the new broker buyer-inbox endpoints.
+- Create endpoints require `Idempotency-Key`; message, activity, and template persistence uses tenant/actor-scoped unique keys and payload hashes. Message writes share the configured Mongo-backed per-actor rate limiter.
+- Lead stage, assignment, spam changes, and notes create activity history. No background job was introduced; inquiry synchronization runs when an authorized broker loads leads.
+

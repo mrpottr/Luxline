@@ -27,6 +27,9 @@ Per rule: "You may touch shared code only at: route registry, navigation registr
 | `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | Found issue 7 | Added the broker namespace catalog for English, Sinhala, and Tamil with safe English fallback. |
 | `frontend/components/broker/i18n/withBrokerTranslations.jsx` | Broker UI seam | Found issue 7 | Routed broker screen text and accessible text attributes through the broker catalog. |
 | `frontend/eslint.config.mjs` | Developer tooling | Found issue 3 | Added focused lint checks for the frontend entry point, HomePage, and broker components. |
+| `backend/app/broker/api/router.py` | Broker route registry | M5 | Registered tenant-scoped broker leads, inbox, and authenticated buyer conversation endpoints under the existing flag-guarded `/api/broker/v1` router. |
+| `backend/app/broker/config.py` | Broker optional config | M5 | Added configurable `BROKER_MESSAGES_PER_MINUTE` with a safe bounded default for messaging throttling. |
+| `backend/.env.example` | Environment schema | M5 | Documented the optional broker messaging rate limit setting. |
 
 ---
 
@@ -39,3 +42,7 @@ Per rule: "You may touch shared code only at: route registry, navigation registr
 ### M4 Listing Management
 
 No shared files were changed for listing persistence, routes, schemas, use cases, or screens. Broker listings and revisions use new `broker_` collections. The two frontend seam corrections above close M0 flag-off and role-visibility gaps found during M4 verification. M4 continuation adds listing media metadata and one optional environment example file; existing listing APIs remain unchanged.
+
+### M5 Leads and Inbox
+
+The only shared route seam change is broker-router registration. The existing `/api/v1/leads/.../inquire` endpoint and its schemas remain unchanged. Broker lead sync reads inquiries attached to the organization's own listing extensions and materializes them in new `broker_` collections. Buyer reads and replies require authentication, the selected organization, matching buyer ownership, and the original seller-contact intent. No background job is added; synchronization occurs when the broker lead list is requested.

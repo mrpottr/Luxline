@@ -9,6 +9,8 @@ import BranchesScreen from './screens/BranchesScreen';
 import ListingsListScreen from './screens/ListingsListScreen';
 import ListingEditorScreen from './screens/ListingEditorScreen';
 import BulkImportScreen from './screens/BulkImportScreen';
+import LeadsKanbanScreen from './screens/LeadsKanbanScreen';
+import InboxScreen from './screens/InboxScreen';
 
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -201,6 +203,12 @@ function BrokerApp() {
           )}
           {activeTab === 'branches' && (
             <BranchesScreen token={token} apiBase={BROKER_API_BASE} />
+          )}
+          {activeTab === 'leads' && (
+            <LeadsKanbanScreen token={token} apiBase={BROKER_API_BASE} />
+          )}
+          {activeTab === 'inbox' && (
+            <InboxScreen token={token} apiBase={BROKER_API_BASE} />
           )}
           {activeTab === 'listings' && !listingEditor && !showBulkImport && (
             <ListingsListScreen

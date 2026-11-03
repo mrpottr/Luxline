@@ -2,7 +2,7 @@
 
 **Branch:** `feature/broker-panel`  
 **Feature Flag:** `BROKER_PANEL_ENABLED` (Default: `false`)  
-**Status:** Approved by continuation request; M0–M3 were already implemented on this branch.
+**Status:** Approved by continuation request; M0–M5 are implemented on this branch.
 
 This milestone plan adapts the Broker Panel specification to Luxline's architecture (FastAPI + MongoEngine + React + Vite). Implementation will strictly follow the safety rules: additive-only, frozen existing APIs, absolute tenant isolation, and verification before committing.
 
@@ -145,6 +145,8 @@ All modifications to existing files are strictly confined to safe seams and logg
   * Direct communication thread between assigned agent and buyer.
 
 ---
+
+**Completion status:** Existing seller-directed inquiries are imported idempotently into tenant-owned lead records when broker lead/inbox views load; no existing inquiry endpoint or response schema was changed. Leads support pipeline stages, explainable rule-based scoring, assignment priority, spam flags, activities, reply templates, and consent-linked authenticated buyer conversations. The lead list refresh is the synchronization trigger; no background poller is introduced. Anonymous inquiries remain visible to their broker team as submitted, but direct platform conversations require a buyer account so replies have an authenticated recipient.
 
 ### Milestone 6: Dashboard, Performance & Analytics
 * **Goal:** Business overview dashboard, key metrics (views, leads, CTR, first-response time), per-listing and per-agent analytics, and CSV exports.

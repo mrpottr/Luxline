@@ -13,6 +13,8 @@ from pymongo import MongoClient
 from pymongo.uri_parser import parse_uri
 
 from backend.app.broker.repositories.listing_repository import BrokerListingRepository
+from backend.app.broker.repositories.lead_repository import BrokerLeadRepository
+from backend.app.broker.models.lead import BrokerLead
 from backend.app.broker.services.mongo_bulk_rate_limiter import MongoBulkRateLimiter
 from backend.app.broker.services.mongo_media_storage import MongoMockMediaStorage
 
@@ -91,6 +93,43 @@ class TestBrokerMongoTenantIsolation(unittest.TestCase):
             expires=stored["expires_at"],
             token=stored["url"].split("token=")[-1],
         ))
+
+    def test_leads_and_conversation_messages_are_tenant_scoped_and_idempotent(self):
+        organization_a = int(uuid4().int % 2_000_000_000) + 1
+        organization_b = organization_a + 1
+        lead = BrokerLead(
+            organization_id=organization_a,
+            inquiry_id=int(uuid4().int % 2_000_000_000) + 1,
+            listing_id=int(uuid4().int % 2_000_000_000) + 1,
+            buyer_id=83,
+            buyer_name="Integration Buyer",
+            buyer_email="buyer@example.com",
+            initial_message="Interested in this listing.",
+        ).save()
+        repository_a = BrokerLeadRepository(organization_a)
+        repository_b = BrokerLeadRepository(organization_b)
+
+        first = repository_a.add_message(
+            lead=lead, sender_type="agent", sender_user_id=84,
+            body="Thank you for your inquiry.", idempotency_key="integration-message-key",
+        )
+        replay = repository_a.add_message(
+            lead=lead, sender_type="agent", sender_user_id=84,
+            body="Thank you for your inquiry.", idempotency_key="integration-message-key",
+        )
+        self.assertEqual(first.id, replay.id)
+        self.assertIsNone(repository_b.find_by_id(lead.id))
+        self.assertIsNone(repository_b.list_messages(lead.id))
+        with self.assertRaises(PermissionError):
+            repository_b.add_message(
+                lead=lead, sender_type="agent", sender_user_id=85,
+                body="Cross-tenant attempt", idempotency_key="cross-tenant-key",
+            )
+        with self.assertRaises(ValueError):
+            repository_a.add_message(
+                lead=lead, sender_type="agent", sender_user_id=84,
+                body="Different content", idempotency_key="integration-message-key",
+            )
 
 
 if __name__ == "__main__":

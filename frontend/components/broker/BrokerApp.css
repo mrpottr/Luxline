@@ -254,6 +254,136 @@
   flex-wrap: wrap;
 }
 
+.broker-lead-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 16px;
+}
+
+.broker-lead-card {
+  margin: 0;
+  padding: 20px;
+}
+
+.broker-lead-heading,
+.broker-lead-actions,
+.broker-inbox-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.broker-lead-heading h2,
+.broker-inbox-thread h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.broker-lead-actions label,
+.broker-inbox-thread label {
+  display: grid;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.broker-lead-actions select,
+.broker-inbox select,
+.broker-inbox textarea {
+  min-width: 140px;
+  border: 1px solid #343943;
+  border-radius: 6px;
+  background: #0d0f12;
+  color: #f3f4f6;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.broker-inbox-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  min-height: 420px;
+  border: 1px solid #262930;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.broker-inbox-list {
+  border-right: 1px solid #262930;
+  background: #0a0b0d;
+}
+
+.broker-inbox-list button {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  padding: 14px;
+  text-align: left;
+  color: #e5e7eb;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #262930;
+  cursor: pointer;
+}
+
+.broker-inbox-list button.active,
+.broker-inbox-list button:hover {
+  background: #1a1d24;
+}
+
+.broker-inbox-list span,
+.broker-inbox-list small {
+  color: #9da3af;
+}
+
+.broker-inbox-thread {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+
+.broker-message-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.broker-message {
+  max-width: 85%;
+  padding: 12px 14px;
+  border: 1px solid #343943;
+  border-radius: 8px;
+  background: #1a1d24;
+  overflow-wrap: anywhere;
+}
+
+.broker-message-agent {
+  align-self: flex-end;
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.broker-message p {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+}
+
+.broker-message small {
+  color: #9da3af;
+}
+
+.broker-inbox-thread textarea {
+  width: 100%;
+  resize: vertical;
+}
+
 @media (max-width: 640px) {
   .broker-listing-form-grid,
   .broker-listing-form-grid--price {
@@ -262,6 +392,21 @@
 
   .broker-listing-row {
     align-items: flex-start !important;
+  }
+
+  .broker-inbox-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .broker-inbox-list {
+    border-right: 0;
+    border-bottom: 1px solid #262930;
+    max-height: 220px;
+    overflow: auto;
+  }
+
+  .broker-content {
+    padding: 16px;
   }
 }
 
