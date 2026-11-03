@@ -22,3 +22,4 @@ def get_my_broker_context(context: BrokerContext = Depends(get_broker_context)):
         "role": context.role.value,
         "permissions": [p.value for p in context.permissions],
     }
+

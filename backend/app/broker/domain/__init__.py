@@ -13,3 +13,4 @@ __all__ = [
     "ROLE_PERMISSIONS",
     "role_has_permission",
 ]
+

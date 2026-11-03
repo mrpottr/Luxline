@@ -95,3 +95,4 @@ ROLE_PERMISSIONS: dict[BrokerRole, set[BrokerPermission]] = {
 def role_has_permission(role: BrokerRole, permission: BrokerPermission) -> bool:
     """Return True if the specified broker role carries the permission."""
     return permission in ROLE_PERMISSIONS.get(role, set())
+
