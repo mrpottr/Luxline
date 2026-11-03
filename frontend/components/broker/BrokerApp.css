@@ -384,6 +384,127 @@
   resize: vertical;
 }
 
+.broker-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.broker-analytics-card {
+  display: grid;
+  gap: 10px;
+  min-height: 92px;
+  padding: 16px;
+  border: 1px solid #262930;
+  border-radius: 8px;
+  background: #0a0b0d;
+}
+
+.broker-analytics-card span {
+  color: #9da3af;
+  font-size: 0.8rem;
+}
+
+.broker-analytics-card strong {
+  color: #f3f4f6;
+  font-size: 1.35rem;
+}
+
+.broker-chart-card {
+  margin-top: 20px;
+  padding: 18px;
+}
+
+.broker-chart-card h2,
+.broker-analytics-table-section h2 {
+  margin: 0 0 16px;
+  color: #f3f4f6;
+  font-size: 1rem;
+}
+
+.broker-bar-chart {
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  height: 180px;
+  border-bottom: 1px solid #343943;
+}
+
+.broker-bar-column {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  align-items: end;
+  min-width: 2px;
+}
+
+.broker-bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: #d4af37;
+}
+
+.broker-chart-caption {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: #9da3af;
+  font-size: 0.75rem;
+}
+
+.broker-analytics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.broker-analytics-filters label {
+  display: grid;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.broker-analytics-filters input {
+  min-height: 38px;
+  padding: 8px;
+  border: 1px solid #343943;
+  border-radius: 6px;
+  background: #0d0f12;
+  color: #f3f4f6;
+}
+
+.broker-analytics-table-section {
+  margin-top: 28px;
+}
+
+.broker-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.broker-analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.broker-analytics-table th,
+.broker-analytics-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #262930;
+}
+
+.broker-analytics-table thead th {
+  color: #9da3af;
+  font-size: 0.78rem;
+}
+
 @media (max-width: 640px) {
   .broker-listing-form-grid,
   .broker-listing-form-grid--price {

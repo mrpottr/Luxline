@@ -1,6 +1,6 @@
 """Pydantic schemas for Broker API endpoints."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 from urllib.parse import urlsplit
@@ -303,6 +303,15 @@ class BrokerReplyTemplateOut(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BrokerAnalyticsOut(BaseModel):
+    date_from: date
+    date_to: date
+    totals: dict[str, Any]
+    daily: list[dict[str, Any]]
+    by_listing: list[dict[str, Any]]
+    by_agent: list[dict[str, Any]]
 
 class BrokerListingCreate(BaseModel):
     title: str = Field(min_length=5, max_length=255)

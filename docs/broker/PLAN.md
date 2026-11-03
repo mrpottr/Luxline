@@ -1,8 +1,8 @@
 # Luxline Broker Panel: Milestone Implementation Plan
 
-**Branch:** `feature/broker-panel`  
+**Branch:** `main`
 **Feature Flag:** `BROKER_PANEL_ENABLED` (Default: `false`)  
-**Status:** Approved by continuation request; M0–M5 are implemented on this branch.
+**Status:** M0–M5 are implemented on `main`; M6 is implemented with session-scoped listing views and visible-card impressions. CTR is unavailable when impression data is absent.
 
 This milestone plan adapts the Broker Panel specification to Luxline's architecture (FastAPI + MongoEngine + React + Vite). Implementation will strictly follow the safety rules: additive-only, frozen existing APIs, absolute tenant isolation, and verification before committing.
 
@@ -160,7 +160,10 @@ All modifications to existing files are strictly confined to safe seams and logg
 * **Shared Files Touched:** None.
 * **Success Criteria:**
   * Responsive metrics cards and trend charts matching the dark luxury aesthetic.
-  * Accurate calculation of response times and conversion rates.
+  * Accurate calculation of available lead, phone-reveal, response-time, and conversion metrics.
+  * Listing-view and CTR metrics use additive detail-view and visible-impression events; existing marketplace API contracts remain unchanged.
+
+**Completion status:** Dashboard and date-range analytics report tenant-scoped leads, replies, phone reveals, response times, listing views, impressions, CTR, per-listing/per-agent breakdowns, deterministic daily rollups, and CSV exports. Agents are restricted to their own metrics. Public engagement events are anonymous, session-deduplicated in the browser, rate-limited, and accepted only for live, moderation-approved listings owned by approved broker organizations. CTR is null until eligible impressions exist.
 
 ---
 

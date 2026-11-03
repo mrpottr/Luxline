@@ -30,6 +30,8 @@ Per rule: "You may touch shared code only at: route registry, navigation registr
 | `backend/app/broker/api/router.py` | Broker route registry | M5 | Registered tenant-scoped broker leads, inbox, and authenticated buyer conversation endpoints under the existing flag-guarded `/api/broker/v1` router. |
 | `backend/app/broker/config.py` | Broker optional config | M5 | Added configurable `BROKER_MESSAGES_PER_MINUTE` with a safe bounded default for messaging throttling. |
 | `backend/.env.example` | Environment schema | M5 | Documented the optional broker messaging rate limit setting. |
+| `backend/app/broker/api/router.py` | Broker route registry | M6 | Registered analytics summary, CSV, public listing view, and public impression routes under the existing feature-flagged broker API. |
+| `frontend/components/HomePage.jsx` | Approved public listing tracking hook | M6 | When `VITE_BROKER_PANEL_ENABLED=true`, count session-deduplicated impressions after 50% of a live listing card is visible and detail views after an eligible listing opens; failures are best-effort and the flag-off path sends no tracking requests. |
 
 ---
 
@@ -46,3 +48,7 @@ No shared files were changed for listing persistence, routes, schemas, use cases
 ### M5 Leads and Inbox
 
 The only shared route seam change is broker-router registration. The existing `/api/v1/leads/.../inquire` endpoint and its schemas remain unchanged. Broker lead sync reads inquiries attached to the organization's own listing extensions and materializes them in new `broker_` collections. Buyer reads and replies require authentication, the selected organization, matching buyer ownership, and the original seller-contact intent. No background job is added; synchronization occurs when the broker lead list is requested.
+
+### M6 Dashboard and Analytics
+
+The broker route registry is the only backend route seam changed. Analytics events are derived from organization-scoped broker leads/messages, phone-reveal records, and new anonymous view/impression events for this broker's listings, then materialized in new broker collections with daily rollups. The approved `HomePage.jsx` hook sends tracking only while the frontend flag is on; existing marketplace listing APIs and response shapes are untouched. CTR is detail views divided by visible-card impressions and is null without impressions.

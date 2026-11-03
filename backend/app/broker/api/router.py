@@ -9,6 +9,7 @@ from backend.app.broker.api.listings import router as listings_router
 from backend.app.broker.api.media import router as media_router
 from backend.app.broker.api.leads import router as leads_router
 from backend.app.broker.api.inbox import router as inbox_router, buyer_router
+from backend.app.broker.api.analytics import router as analytics_router, view_router
 
 router = APIRouter(dependencies=[Depends(verify_broker_panel_enabled)])
 router.include_router(onboarding_router)
@@ -19,6 +20,8 @@ router.include_router(media_router)
 router.include_router(leads_router)
 router.include_router(inbox_router)
 router.include_router(buyer_router)
+router.include_router(analytics_router)
+router.include_router(view_router)
 
 
 @router.get("/health", tags=["broker-health"])

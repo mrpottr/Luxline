@@ -29,3 +29,10 @@
 - Create endpoints require `Idempotency-Key`; message, activity, and template persistence uses tenant/actor-scoped unique keys and payload hashes. Message writes share the configured Mongo-backed per-actor rate limiter.
 - Lead stage, assignment, spam changes, and notes create activity history. No background job was introduced; inquiry synchronization runs when an authorized broker loads leads.
 
+## M6: Analytics and available event sources
+
+- Build analytics from this organization's `broker_leads`, agent-authored `broker_messages`, and existing phone-reveal records restricted to this organization's `broker_listings`. Materialize source events with unique source keys, then refresh daily rollups idempotently when an authorized report is requested; no analytics worker is added.
+- The conversion metric is qualified-or-closed leads divided by all leads created in the selected period. It is a current-stage cohort measure and can change as leads progress. Response-time and per-agent attribution use the lead's current assignment because existing records do not preserve assignment history.
+- Agents can only query/export their own assigned lead and response data; managers, owners, and analytics viewers use organization scope.
+- Add anonymous, session-deduplicated public listing detail views and visible-card impressions through two flag-guarded broker analytics routes. The approved HomePage hook sends only listing IDs, never buyer identity; impressions require 50% visibility and are counted once per listing per browser session. Public events are accepted only for active, moderation-approved listings with an approved broker profile and are throttled per visitor/listing. CTR is detail views divided by impressions and remains unavailable when a report has no impressions. Existing marketplace endpoint contracts remain unchanged.
+

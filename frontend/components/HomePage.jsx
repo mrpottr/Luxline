@@ -145,6 +145,34 @@ async function callApi(url, options = {}, token = '') {
   return data;
 }
 
+function hasTrackedBrokerSignal(key) {
+  try {
+    return window.sessionStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markBrokerSignalTracked(key) {
+  try {
+    window.sessionStorage.setItem(key, '1');
+  } catch {
+    // Tracking remains best-effort when browser storage is unavailable.
+  }
+}
+
+function trackBrokerSignal(signal, listingId) {
+  if (import.meta.env.VITE_BROKER_PANEL_ENABLED !== 'true' || !listingId) return;
+  const storageKey = `broker-${signal}-${listingId}`;
+  if (hasTrackedBrokerSignal(storageKey)) return;
+  markBrokerSignalTracked(storageKey);
+  fetch(`${API_BASE.replace('/api/v1', '/api/broker/v1')}/analytics/${signal}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ listing_id: listingId }),
+  }).catch(() => {});
+}
+
 export default function HomePage() {
   const location = useLocation();
   const routerNavigate = useNavigate();
@@ -407,16 +435,39 @@ export default function HomePage() {
     if (route.page !== 'listing' || !route.id) {
       return;
     }
+    let cancelled = false;
     async function loadListing() {
       try {
         const row = await callApi(`${API_BASE}/listings/${route.id}`, {}, token);
         setSelectedListing(row);
+        if (!cancelled && row.status === 'active' && row.moderation_status === 'approved') trackBrokerSignal('views', row.id);
       } catch (_err) {
         setSelectedListing(null);
       }
     }
     loadListing();
+    return () => { cancelled = true; };
   }, [route.page, route.id, token]);
+
+  useEffect(() => {
+    if (
+      import.meta.env.VITE_BROKER_PANEL_ENABLED !== 'true'
+      || !['home', 'listings'].includes(route.page)
+      || typeof IntersectionObserver === 'undefined'
+    ) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          trackBrokerSignal('impressions', Number(entry.target.dataset.brokerListingId));
+          observer.unobserve(entry.target);
+        }
+      }
+    }, { threshold: 0.5 });
+
+    document.querySelectorAll('[data-broker-listing-id]').forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, [route.page, listings, listingsLoading, search, category, continent, country, stateProvince]);
 
   useEffect(() => {
     if (!token || (route.page !== 'dashboard' && route.page !== 'account')) {
@@ -1024,7 +1075,12 @@ export default function HomePage() {
     return (
       <div className="listing-grid reveal">
         {rows.map((row, idx) => (
-          <article key={row.id} className={`listing-card ${idx === 0 ? 'large' : ''}`} onClick={() => openListing(row)}>
+          <article
+            key={row.id}
+            className={`listing-card ${idx === 0 ? 'large' : ''}`}
+            data-broker-listing-id={import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' ? row.id : undefined}
+            onClick={() => openListing(row)}
+          >
             <img src={row.media_items?.[0]?.url || imageUrl('luxury-lifestyle.jpg')} alt={row.title} loading="lazy" />
             <div className="listing-content">
               <p className="type">{categoryLabel(row.category)}</p>

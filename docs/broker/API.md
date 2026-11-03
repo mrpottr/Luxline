@@ -54,3 +54,16 @@ All endpoints below require `BROKER_PANEL_ENABLED=true` and a bearer token. Brok
 | GET, POST | `/buyer/inbox/{lead_id}/messages?organization_id={id}` | Authenticated buyer owning that lead | Read with `limit`/`offset` or add messages to the buyer's own conversation. Create requires an idempotency key and is rate-limited. |
 
 Lead assignment uses listing assignment first, a future routing-rule match second, least-loaded active-agent selection third, and manager/owner queue last. Lead scores are deterministic and use contact/account completeness and inquiry text length only. Inquiry sync happens on the lead-list request, not in a background job. A seller-directed public inquiry is treated as consent to receive a response from that broker; anonymous inquiries do not support platform messaging because no authenticated buyer identity exists.
+
+## Analytics
+
+Public engagement capture is also available at `POST /analytics/views` and `POST /analytics/impressions`. Each accepts `{"listing_id": 123}`, is feature-flagged, anonymous, and rate-limited per visitor/listing. Views count an eligible listing detail open; impressions count a listing card once it is at least 50% visible in the discovery grid. CTR is views divided by impressions and is null when no impressions exist.
+
+Analytics routes require the feature flag, bearer authentication, selected organization, active membership, an approved broker profile, and `broker:analytics:view`. The maximum query window is 366 calendar days. Reports are limited to 100,000 source events per query; narrow the date range if the cap is exceeded. Event materialization and daily rollups are tenant-scoped and refreshed on report requests.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/analytics` | Return totals, daily series, and per-listing/per-agent impression, view, CTR, lead, reply, phone-reveal, response-time, and qualified-conversion metrics. Optional filters: `date_from`, `date_to`, `listing_id`, `agent_id`. |
+| GET | `/analytics/export.csv` | Export a paginated listing or agent breakdown with `date_from`, `date_to`, `dimension`, `limit` (1–500), and `offset`. |
+
+Qualified conversion means qualified or closed leads divided by all leads created in the requested period. Click-through rate is detail views divided by visible listing impressions and is null when no impressions exist. Impressions are counted once per listing per browser session after at least 50% visibility. Response-time and agent attribution follow the lead’s current assignment; listing engagement follows its current assigned agent. Existing marketplace endpoint contracts remain unchanged.

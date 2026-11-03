@@ -6,6 +6,7 @@ The test suite never falls back to the application's DATABASE_URL.
 
 import os
 import unittest
+from datetime import date, datetime, time
 from uuid import uuid4
 
 from mongoengine import connect, disconnect
@@ -14,7 +15,9 @@ from pymongo.uri_parser import parse_uri
 
 from backend.app.broker.repositories.listing_repository import BrokerListingRepository
 from backend.app.broker.repositories.lead_repository import BrokerLeadRepository
+from backend.app.broker.repositories.analytics_repository import BrokerAnalyticsRepository
 from backend.app.broker.models.lead import BrokerLead
+from backend.app.broker.models.analytics import BrokerAnalyticsEvent, BrokerAnalyticsDailyRollup
 from backend.app.broker.services.mongo_bulk_rate_limiter import MongoBulkRateLimiter
 from backend.app.broker.services.mongo_media_storage import MongoMockMediaStorage
 
@@ -130,6 +133,41 @@ class TestBrokerMongoTenantIsolation(unittest.TestCase):
                 lead=lead, sender_type="agent", sender_user_id=84,
                 body="Different content", idempotency_key="integration-message-key",
             )
+
+    def test_analytics_events_and_rollups_are_tenant_scoped_and_repeatable(self):
+        organization_a = int(uuid4().int % 2_000_000_000) + 1
+        organization_b = organization_a + 1
+        event_date = date.today()
+        event_time = datetime.combine(event_date, time.min)
+        repository_a = BrokerAnalyticsRepository(organization_a)
+        repository_b = BrokerAnalyticsRepository(organization_b)
+        kwargs = {
+            "source_type": "lead", "source_id": int(uuid4().int % 2_000_000_000) + 1,
+            "event_type": "lead_created", "listing_id": 7001, "agent_user_id": 7002,
+            "occurred_at": event_time, "response_seconds": 120, "lead_stage": "qualified",
+        }
+        repository_a.record_source_event(**kwargs)
+        repository_a.record_source_event(**kwargs)
+        self.assertEqual(BrokerAnalyticsEvent.objects(organization_id=organization_a, source_id=kwargs["source_id"]).count(), 1)
+        self.assertEqual(repository_a.list_events(start=event_date, end=event_date, listing_id=None, agent_id=None)[0].listing_id, 7001)
+        self.assertEqual(repository_b.list_events(start=event_date, end=event_date, listing_id=None, agent_id=None), [])
+
+        repository_a.save_rollups([{
+            "day": event_date, "listing_id": 0, "agent_user_id": 0, "leads": 1,
+            "replies": 0, "phone_reveals": 0, "average_response_seconds": 120,
+            "response_count": 1, "response_seconds_total": 120,
+        }])
+        repository_a.save_rollups([{
+            "day": event_date, "listing_id": 0, "agent_user_id": 0, "leads": 1,
+            "replies": 0, "phone_reveals": 0, "average_response_seconds": 120,
+            "response_count": 1, "response_seconds_total": 120,
+        }])
+        self.assertEqual(BrokerAnalyticsDailyRollup.objects(
+            organization_id=organization_a, day=event_date, listing_id=0, agent_user_id=0,
+        ).count(), 1)
+        self.assertEqual(BrokerAnalyticsDailyRollup.objects(
+            organization_id=organization_b, day=event_date, listing_id=0, agent_user_id=0,
+        ).count(), 0)
 
 
 if __name__ == "__main__":

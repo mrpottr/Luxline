@@ -11,6 +11,8 @@ import ListingEditorScreen from './screens/ListingEditorScreen';
 import BulkImportScreen from './screens/BulkImportScreen';
 import LeadsKanbanScreen from './screens/LeadsKanbanScreen';
 import InboxScreen from './screens/InboxScreen';
+import DashboardOverviewScreen from './screens/DashboardOverviewScreen';
+import AnalyticsScreen from './screens/AnalyticsScreen';
 
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
@@ -230,24 +232,8 @@ function BrokerApp() {
               onDone={() => setListingEditor(null)}
             />
           )}
-          {activeTab === 'dashboard' && (
-            <div className="broker-card">
-              <div className="broker-card-header">
-                <span className="broker-badge-pill">Operational Dashboard</span>
-                <h1 className="broker-card-title" style={{ marginTop: '12px' }}>
-                  Broker Command Center
-                </h1>
-                <p className="broker-card-subtitle">
-                  Manage inventory, respond to inquiries, monitor lead routing, and allocate visibility boosts.
-                </p>
-              </div>
-
-              <div className="broker-status-box">
-                <div><strong>Feature Flag:</strong> BROKER_PANEL_ENABLED = {String(IS_ENABLED)}</div>
-                <div><strong>Target API:</strong> {BROKER_API_BASE}</div>
-              </div>
-            </div>
-          )}
+          {activeTab === 'dashboard' && <DashboardOverviewScreen token={token} apiBase={BROKER_API_BASE} />}
+          {activeTab === 'analytics' && <AnalyticsScreen token={token} apiBase={BROKER_API_BASE} />}
         </div>
       </main>
     </div>
