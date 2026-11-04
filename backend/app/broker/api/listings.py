@@ -22,6 +22,7 @@ def get_listing_use_cases(context: ListingContext = Depends(get_listing_context)
     return ListingUseCases(
         provider, context.permissions, listing_config, context.role, context.user.id,
         broker_rate_limiter, context.organization_id,
+        require_commission_terms=getattr(context.user.role, "value", context.user.role) == "broker_account",
     )
 
 

@@ -26,6 +26,7 @@ class UserRole(str, Enum):
     standard_user = "standard_user"
     private_seller = "private_seller"
     business_account = "business_account"
+    broker_account = "broker_account"
     super_admin = "super_admin"
 
 

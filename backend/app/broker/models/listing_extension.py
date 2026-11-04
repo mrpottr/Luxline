@@ -23,7 +23,10 @@ class BrokerListing(BrokerBaseDocument):
     listing_id = IntField(required=True)
     assigned_agent_id = IntField()
     branch_id = IntField()
+    owner_name = StringField(max_length=200)
+    owner_mandate_reference = StringField(max_length=200)
     owner_consent = BooleanField(default=False)
+    commission_terms = StringField(max_length=2000)
     quality_score = IntField(default=0)
     quality_rating = StringField(default="red", max_length=20)  # green | orange | red
     quality_suggestions = ListField(StringField(), default=list)

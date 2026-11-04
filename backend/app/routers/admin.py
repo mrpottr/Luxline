@@ -109,7 +109,7 @@ def admin_update_user_role(
         raise HTTPException(status_code=400, detail="Cannot assign super admin role from this endpoint")
 
     user.role = payload.role
-    user.is_2fa_enabled = payload.role == UserRole.business_account
+    user.is_2fa_enabled = payload.role in {UserRole.business_account, UserRole.broker_account}
     db.add(user)
     db.add(
         AuditLog(

@@ -5,7 +5,7 @@ function newIdempotencyKey() {
   return globalThis.crypto?.randomUUID?.() || `broker-listing-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function ListingEditorScreen({ token, apiBase, onDone, listing = null }) {
+function ListingEditorScreen({ token, apiBase, onDone, listing = null, requiresCommissionTerms = false }) {
   const [saving, setSaving] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [uploadAltText, setUploadAltText] = useState('');
@@ -43,7 +43,10 @@ function ListingEditorScreen({ token, apiBase, onDone, listing = null }) {
     location_city: listing?.location_city || '',
     description: listing?.description || '',
     media: listing?.media || (listing?.photos || []).map((url, sort_order) => ({ url, media_type: 'image', sort_order, alt_text: '' })),
+    owner_name: listing?.owner_name || '',
+    owner_mandate_reference: listing?.owner_mandate_reference || '',
     owner_consent: listing?.owner_consent || false,
+    commission_terms: listing?.commission_terms || '',
     urgent_flag: listing?.urgent_flag || false,
   });
 
@@ -81,6 +84,11 @@ function ListingEditorScreen({ token, apiBase, onDone, listing = null }) {
           submitted_via: 'broker_portal',
         },
       };
+      if (requiresCommissionTerms) {
+        payload.owner_name = form.owner_name.trim();
+        payload.owner_mandate_reference = form.owner_mandate_reference.trim();
+        payload.commission_terms = form.commission_terms.trim();
+      }
       const serializedPayload = JSON.stringify(payload);
       if (previousPayload.current !== serializedPayload) {
         previousPayload.current = serializedPayload;
@@ -314,6 +322,45 @@ function ListingEditorScreen({ token, apiBase, onDone, listing = null }) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#1a1d24', borderRadius: '6px' }}>
+          {requiresCommissionTerms && (
+            <div>
+              <label htmlFor="broker-owner-name" style={{ display: 'block', fontSize: '0.85rem', color: '#fff', marginBottom: '6px' }}>
+                Property owner's legal name
+              </label>
+              <input
+                id="broker-owner-name"
+                maxLength={200}
+                required
+                value={form.owner_name}
+                onChange={(event) => setForm({ ...form, owner_name: event.target.value })}
+              />
+              <label htmlFor="broker-owner-mandate" style={{ display: 'block', fontSize: '0.85rem', color: '#fff', margin: '10px 0 6px' }}>
+                Owner mandate or consent reference
+              </label>
+              <input
+                id="broker-owner-mandate"
+                maxLength={200}
+                required
+                value={form.owner_mandate_reference}
+                onChange={(event) => setForm({ ...form, owner_mandate_reference: event.target.value })}
+                placeholder="Reference or identifier for the signed mandate"
+              />
+              <label htmlFor="broker-commission-terms" style={{ display: 'block', fontSize: '0.85rem', color: '#fff', marginBottom: '6px' }}>
+                Commission agreement with the owner
+              </label>
+              <textarea
+                id="broker-commission-terms"
+                maxLength={2000}
+                required
+                rows={3}
+                value={form.commission_terms}
+                onChange={(event) => setForm({ ...form, commission_terms: event.target.value })}
+                placeholder="Record the agreed commission terms. Luxline does not calculate or pay commissions."
+                aria-describedby="broker-commission-note"
+              />
+              <small id="broker-commission-note">Record the agreed commission terms. Luxline does not calculate or pay commissions.</small>
+            </div>
+          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#fff', cursor: 'pointer' }}>
             <input
               type="checkbox"

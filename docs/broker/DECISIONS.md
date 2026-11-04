@@ -47,3 +47,11 @@
 - Plan subscriptions and credit pack purchases use stable request keys. Credit debit plus ledger row plus promotion row commit atomically. Future-dated promotions start as `scheduled`; this milestone does not add an activation worker.
 - Existing marketplace subscriptions continue to satisfy existing publish checks. A broker plan adds plan limits and entitlements without changing marketplace subscription documents or endpoints.
 - The admin plan screen is nested in the current admin portal and guarded by the frontend feature flag; broker owners alone see billing, while owners and managers see promotion tools. API use cases and routes enforce permissions independently.
+
+
+## Independent property broker account
+
+- Add a separate broker_account signup role, shown only while the broker feature flag is enabled. Keep the existing business_account role and organization-scoped broker_owner/manager/agent/viewer roles distinct.
+- Create the broker's existing AgencyProfile as their brokerage organization; it represents their business, not ownership of any listed property. Preserve broker profile approval, region licence checks, and explicit owner consent before publishing.
+- Record the seller-agreed commission terms on each broker listing as bounded text. Do not calculate, collect, or distribute money in this milestone.
+- Property-broker publish requires a recorded owner name, mandate reference, explicit owner-consent confirmation, and agreed commission terms. The reference records external authorization metadata only; Luxline does not issue mandates or calculate/pay commissions.

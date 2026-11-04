@@ -3,5 +3,5 @@ export function isBrokerPanelEnabled(value) {
 }
 
 export function canShowBrokerNavigation(flagValue, role) {
-  return isBrokerPanelEnabled(flagValue) && role === 'business_account';
+  return isBrokerPanelEnabled(flagValue) && ['business_account', 'broker_account'].includes(role);
 }

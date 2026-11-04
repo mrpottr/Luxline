@@ -36,7 +36,8 @@ function getRoleFromJwt(jwtToken) {
 
 function BrokerApp() {
   const [token] = useState(localStorage.getItem('luxline_token') || '');
-  const [role, setRole] = useState(getRoleFromJwt(token));
+  const accountRole = getRoleFromJwt(token);
+  const [role, setRole] = useState(accountRole);
   const [, setLocaleRefresh] = useState(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [brokerHealth, setBrokerHealth] = useState(null);
@@ -262,6 +263,7 @@ function BrokerApp() {
               token={token}
               apiBase={BROKER_API_BASE}
               listing={listingEditor.listing_id ? listingEditor : null}
+              requiresCommissionTerms={accountRole === 'broker_account'}
               onDone={() => setListingEditor(null)}
             />
           )}

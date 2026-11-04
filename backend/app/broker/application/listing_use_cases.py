@@ -13,7 +13,17 @@ from backend.app.broker.services.bulk_import import BulkImportService
 class ListingUseCases:
     """Application boundary for listing actions and permission enforcement."""
 
-    def __init__(self, provider: ListingProvider, permissions: set[Any], config: Any, role: Any, actor_user_id: int, rate_limiter: RateLimiter | None = None, organization_id: int | None = None):
+    def __init__(
+        self,
+        provider: ListingProvider,
+        permissions: set[Any],
+        config: Any,
+        role: Any,
+        actor_user_id: int,
+        rate_limiter: RateLimiter | None = None,
+        organization_id: int | None = None,
+        require_commission_terms: bool = False,
+    ):
         self.provider = provider
         self.permissions = permissions
         self.config = config
@@ -21,6 +31,7 @@ class ListingUseCases:
         self.actor_user_id = actor_user_id
         self.rate_limiter = rate_limiter
         self.organization_id = organization_id
+        self.require_commission_terms = require_commission_terms
 
     def _require(self, permission: Any) -> None:
         if permission not in self.permissions:
@@ -92,6 +103,11 @@ class ListingUseCases:
                 media_count=context["media_count"],
                 minimum_media_count=self.config.minimum_media_count,
                 price_floors=self.config.price_floors,
+                commission_terms=context.get("commission_terms"),
+                require_commission_terms=self.require_commission_terms,
+                owner_name=context.get("owner_name"),
+                owner_mandate_reference=context.get("owner_mandate_reference"),
+                require_owner_mandate=self.require_commission_terms,
             )
             if not valid:
                 raise ValueError("Cannot publish listing: " + "; ".join(reasons))

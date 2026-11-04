@@ -60,6 +60,35 @@ class TestListingRules(unittest.TestCase):
         self.assertFalse(allowed)
         self.assertGreaterEqual(len(reasons), 7)
 
+    def test_property_broker_must_record_commission_terms_before_publishing(self):
+        eligibility = dict(
+            is_approved_broker=True,
+            has_active_plan=True,
+            valid_region_licence=True,
+            owner_consent=True,
+            category="real_estate",
+            currency="LKR",
+            price=100,
+            quality_score=80,
+            media_count=5,
+            minimum_media_count=5,
+            price_floors={},
+            require_commission_terms=True,
+            require_owner_mandate=True,
+        )
+        allowed, reasons = ListingRules.validate_publish_eligibility(**eligibility)
+        self.assertFalse(allowed)
+        self.assertIn("The agreed commission terms must be recorded before publishing.", reasons)
+
+        allowed, reasons = ListingRules.validate_publish_eligibility(
+            **eligibility,
+            owner_name="Property Owner",
+            owner_mandate_reference="MANDATE-2026-001",
+            commission_terms="5% of the completed sale price, payable by the seller.",
+        )
+        self.assertTrue(allowed)
+        self.assertEqual(reasons, [])
+
     def test_quality_score_returns_actionable_suggestions(self):
         score, rating, suggestions = QualityScoreCalculator.calculate(
             title="x", description="short", price=0, photo_count=0,
@@ -252,6 +281,15 @@ class TestListingContextIsolation(unittest.TestCase):
 
         self.assertEqual(context.organization_id, 101)
         self.assertEqual(context.role, BrokerRole.broker_manager)
+
+    def test_property_broker_owner_resolves_through_its_brokerage_profile(self):
+        from backend.app.broker.domain.roles import BrokerRole
+        self.provider.find_owned_organization.return_value = 303
+        self.provider.find_member_role.return_value = None
+        context = self.access.resolve(user_id=8, user_role="broker_account", requested_organization_id=None)
+
+        self.assertEqual(context.organization_id, 303)
+        self.assertEqual(context.role, BrokerRole.broker_owner)
 
     def test_standard_user_requires_an_active_membership(self):
         from backend.app.broker.domain.roles import BrokerRole

@@ -72,3 +72,29 @@ The broker route registry is the only backend route seam changed. Analytics even
 | `frontend/components/broker/index.jsx` | Broker public module entry | M8 | Exported buyer review and admin trust screens for route/admin wiring through the feature module entry point. |
 | `frontend/index.jsx` | Route registry | M8 | Added `/buyer/reviews` only when the existing broker frontend flag is enabled. |
 | `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | M8 | Added trust navigation labels to the English, Sinhala, and Tamil broker catalogs. |
+
+### Independent property broker account
+
+| File | Seam Category | Milestone | Reason & What Changed |
+| :--- | :--- | :--- | :--- |
+| `backend/app/models.py` | Role registry | M2 extension | Added the additive `broker_account` user role; existing role values are unchanged. |
+| `backend/app/routers/auth.py` | Existing registration/auth route | M2 extension | Blocks broker signup while the backend flag is off, provisions an AgencyProfile for broker accounts, and applies the existing 2FA flow to the new role. Existing request fields and response formats are unchanged. |
+| `frontend/components/HomePage.jsx` | Signup and navigation registry | M2 extension | Shows the Property Broker choice and broker navigation only when the frontend flag is enabled; labels the account distinctly. |
+| `frontend/components/AdminDashboard.jsx` | Existing role administration UI | M2 extension | Adds the flagged Property Broker role to account creation and role management choices. |
+| `backend/app/broker/api/listings.py` | Broker route registry | M2 extension | Applies the property-broker-specific requirement to record commission terms before publish through the existing listing use case. |
+| `backend/app/broker/domain/listing_rules.py` | Broker domain seam | M2 extension | Adds the conditional commission-terms publish rule; default behavior for existing business accounts is unchanged. |
+| `backend/app/broker/application/listing_use_cases.py` | Broker application seam | M2 extension | Passes broker account commission requirements into the domain validation. |
+| `backend/app/broker/application/access_use_cases.py` | Broker organization access | M2 extension | Resolves the new account type to the AgencyProfile it owns while keeping private sellers excluded. |
+| `backend/app/broker/models/listing_extension.py` | Broker extension model | M2 extension | Adds nullable owner name, mandate reference, and commission terms on the new broker listing extension; no existing collection is altered. |
+| `backend/app/broker/schemas.py` | Broker API schemas | M2 extension | Accepts and returns optional bounded owner and commission agreement fields on broker listing payloads. |
+| `backend/app/broker/services/listing_provider.py` | Broker repository adapter | M2 extension | Persists owner and commission fields on tenant-scoped broker listing extensions and revision snapshots. |
+| `frontend/components/broker/screens/ListingEditorScreen.jsx` | Broker UI | M2 extension | Shows commission agreement capture only for the property broker signup role. |
+| `frontend/components/broker/BrokerApp.jsx` | Broker navigation registry | M2 extension | Preserves the original account persona from JWT for property-broker-specific editor behavior. |
+| `tests/test_broker_listings.py` | Broker test seam | M2 extension | Adds domain validation and organization resolution tests for commission and property broker behavior. |
+| `frontend/tests/brokerFeatureFlag.test.mjs` | Broker frontend tests | M2 extension | Verifies the property broker nav is shown only when the existing flag is enabled. |
+| `backend/app/routers/admin.py` | Existing role administration route | M2 extension | Preserves the business 2FA requirement when an administrator assigns the new broker account role. |
+| `frontend/components/AdminDashboard.jsx` | Existing role administration UI | M2 extension | Adds the flagged Property Broker role to account creation and role management choices. |
+| `frontend/components/broker/featureFlag.mjs` | Broker navigation seam | M2 extension | Allows the enabled broker panel for `broker_account` as well as business account users. |
+| `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | M2 extension | Added the Property Broker and commission agreement strings to the broker namespace. |
+| `docker-compose.yml` | Runtime configuration | M2 extension | Passes `BROKER_PANEL_ENABLED` to the backend and the Vite flag as a frontend build argument; both default to false. |
+| `frontend/Dockerfile` | Frontend build configuration | M2 extension | Declares the optional Vite broker flag build argument with a false default and embeds it at build time. |

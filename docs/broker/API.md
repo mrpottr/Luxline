@@ -113,3 +113,12 @@ Trust routes are under the same feature-flagged `/api/broker/v1` router. Broker 
 | POST | `/admin/reviews/{review_id}/decision` | Platform `super_admin` | Publish or reject a review; body includes `decision` and optional `notes`. |
 
 Review integrity checks reject seller/broker self-reviews and duplicate buyer/listing reviews; detected attempts create moderation cases. Badge rule version 1 awards Verified Seller to approved broker profiles, Quality Lister for five or more approved live listings averaging quality 85+, and Responsive Agent for five or more first responses averaging at most one hour. Badge evaluations are refreshed on request. Owner/manager operations, moderation, profile decisions, member role changes, credit movements, promotions, subscriptions, and analytics exports write audit rows; money-related audit writes share their transaction. Existing profile/team writes and their additional audit records are not atomic. Validation errors use FastAPI's existing `detail` error envelope (422), permission failures return 403, duplicate integrity violations return 409, and missing resources return 404.
+
+
+## Property broker signup and commission records
+
+When the broker panel flag is enabled, /api/v1/auth/register accepts the additive broker_account role. Registration provisions the account's existing AgencyProfile as the brokerage organization and applies the existing email verification and 2FA flows. With the backend flag off, broker_account registration returns 404.
+
+Broker listing create/update responses include commission_terms (maximum 2,000 characters). A broker_account cannot publish a listing until owner_consent is true and commission_terms is non-empty. These terms are stored for reference only; Luxline does not calculate, collect, or pay commission.
+
+Property-broker listing create/update payloads also accept owner_name and owner_mandate_reference, each up to 200 characters. Their value is retained in tenant-scoped listing extension records and revision history. Property-broker publish eligibility requires both fields in addition to explicit owner_consent and commission_terms. The mandate reference identifies external owner authorization; this feature does not issue legal mandates.

@@ -37,6 +37,9 @@ class TestBrokerDomainRoles(unittest.TestCase):
         self.assertEqual(BrokerRole.broker_agent.value, "broker_agent")
         self.assertEqual(BrokerRole.broker_viewer.value, "broker_viewer")
 
+    def test_property_broker_is_an_additive_signup_role(self):
+        self.assertEqual(UserRole.broker_account.value, "broker_account")
+
     def test_owner_has_all_permissions(self):
         for perm in BrokerPermission:
             self.assertTrue(

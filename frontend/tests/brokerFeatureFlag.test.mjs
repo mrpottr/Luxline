@@ -12,7 +12,9 @@ test('broker panel flag is off unless explicitly set to true', () => {
 
 test('broker navigation requires the flag and a business account role', () => {
   assert.equal(canShowBrokerNavigation('true', 'business_account'), true);
+  assert.equal(canShowBrokerNavigation('true', 'broker_account'), true);
   assert.equal(canShowBrokerNavigation('false', 'business_account'), false);
+  assert.equal(canShowBrokerNavigation('false', 'broker_account'), false);
   assert.equal(canShowBrokerNavigation('true', 'standard_user'), false);
 });
 

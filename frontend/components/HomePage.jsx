@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { canShowBrokerNavigation } from './broker';
+import { canShowBrokerNavigation, translateBrokerMessage } from './broker';
 import './HomePage.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const BROKER_PANEL_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true';
 
 const MARKET_NAV_LINKS = [
   { label: 'Real Estate', category: 'real_estate' },
@@ -83,6 +84,7 @@ function roleLabel(value) {
     standard_user: 'Buyer',
     private_seller: 'Private Seller',
     business_account: 'Business Account',
+    broker_account: 'Property Broker',
     super_admin: 'Administrator'
   };
   return map[value] || String(value || '').replaceAll('_', ' ');
@@ -491,7 +493,7 @@ export default function HomePage() {
         let ingestionJobs = [];
         let taxonomyTerms = [];
         let fraudSignals = [];
-        if (['business_account', 'super_admin'].includes(me.role)) {
+        if (['business_account', 'broker_account', 'super_admin'].includes(me.role)) {
           [apiKeys, ingestionJobs] = await Promise.all([
             callApi(`${API_BASE}/api-keys`, {}, token).catch(() => []),
             callApi(`${API_BASE}/ingestion/jobs`, {}, token).catch(() => [])
@@ -1463,6 +1465,11 @@ export default function HomePage() {
                   <option value="standard_user">Buyer</option>
                   <option value="private_seller">Private Seller</option>
                   <option value="business_account">Business Account</option>
+                  {BROKER_PANEL_ENABLED && (
+                    <option value="broker_account">
+                      {translateBrokerMessage('Property Broker', localStorage.getItem('luxline_language') || navigator.language)}
+                    </option>
+                  )}
                 </select>
               </>
             ) : null}
@@ -1573,8 +1580,8 @@ export default function HomePage() {
     }
 
     const currentRole = dashboardData.me?.role || '';
-    const canPostListings = ['private_seller', 'business_account'].includes(currentRole);
-    const canUseBrokerTools = ['business_account', 'super_admin'].includes(currentRole);
+    const canPostListings = ['private_seller', 'business_account', 'broker_account'].includes(currentRole);
+    const canUseBrokerTools = ['business_account', 'broker_account', 'super_admin'].includes(currentRole);
     const isDashboardAdmin = currentRole === 'super_admin';
     const userListings = listings.filter((row) => row.seller_id === dashboardData.me?.id);
     const activeListings = userListings.filter((row) => row.status === 'active');

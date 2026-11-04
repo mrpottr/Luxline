@@ -29,6 +29,11 @@ class ListingRules:
         media_count: int,
         minimum_media_count: int,
         price_floors: Mapping[str, Mapping[str, float]],
+        commission_terms: str | None = None,
+        require_commission_terms: bool = False,
+        owner_name: str | None = None,
+        owner_mandate_reference: str | None = None,
+        require_owner_mandate: bool = False,
     ) -> Tuple[bool, list[str]]:
         reasons = []
 
@@ -43,6 +48,16 @@ class ListingRules:
 
         if not owner_consent:
             reasons.append("Owner representation consent must be verified.")
+
+        if require_commission_terms and not (commission_terms or "").strip():
+            reasons.append("The agreed commission terms must be recorded before publishing.")
+
+        if require_owner_mandate and not (owner_name or "").strip():
+            reasons.append("The property owner's name must be recorded before publishing.")
+        if require_owner_mandate and not (owner_mandate_reference or "").strip():
+            reasons.append("The owner's representation mandate reference must be recorded before publishing.")
+        if require_owner_mandate and not owner_consent:
+            reasons.append("Owner consent must be confirmed for a property-broker listing.")
 
         price_floor = cls.get_price_floor(category, currency, price_floors)
         if price_floor is not None and price < price_floor:

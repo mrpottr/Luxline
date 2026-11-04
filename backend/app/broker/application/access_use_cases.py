@@ -23,7 +23,7 @@ class ListingAccessUseCases:
             raise PermissionError("Use an eligible business account or an enrolled broker team account")
 
         owned_organization_id = None
-        if user_role == "business_account":
+        if user_role in {"business_account", "broker_account"}:
             owned_organization_id = self.provider.find_owned_organization(user_id=user_id)
             if owned_organization_id is None:
                 raise PermissionError("An existing organization profile is required")
@@ -35,7 +35,7 @@ class ListingAccessUseCases:
             )
             if member_role is not None:
                 organization_id, role = requested_organization_id, member_role
-            elif user_role == "business_account" and owned_organization_id == requested_organization_id:
+            elif user_role in {"business_account", "broker_account"} and owned_organization_id == requested_organization_id:
                 organization_id, role = requested_organization_id, BrokerRole.broker_owner
             else:
                 raise PermissionError("No access to this broker organization")

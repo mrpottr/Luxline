@@ -17,7 +17,7 @@ from backend.app.core.security import (
 )
 from backend.app.db.session import Session, get_db
 from backend.app.dependencies import get_current_user as get_current_user_dep
-from backend.app.models import EmailVerificationChallenge, SocialAccount, TwoFactorChallenge, User, UserRole
+from backend.app.models import AgencyProfile, EmailVerificationChallenge, SocialAccount, TwoFactorChallenge, User, UserRole
 from backend.app.schemas import (
     EmailVerificationRequest,
     EmailVerificationResendRequest,
@@ -55,6 +55,8 @@ def _create_email_verification(db: Session, user: User) -> tuple[EmailVerificati
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user account with role-based defaults."""
+    if payload.role == UserRole.broker_account and not settings.broker_panel_enabled:
+        raise HTTPException(status_code=404, detail="Property Broker registration is disabled")
     existing = User.objects(email=payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -69,11 +71,26 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
         last_name=payload.last_name,
         phone=payload.phone,
         role=payload.role,
-        is_2fa_enabled=payload.role == UserRole.business_account,
+        is_2fa_enabled=payload.role in {UserRole.business_account, UserRole.broker_account},
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+    if payload.role == UserRole.broker_account:
+        profile = None
+        try:
+            profile = AgencyProfile(
+                owner_id=user.id,
+                name=f"{user.first_name} {user.last_name} Brokerage"[:200],
+                contact_email=user.email,
+                contact_phone=user.phone,
+            )
+            profile.save()
+        except Exception:
+            if profile and profile.id:
+                profile.delete()
+            user.delete()
+            raise
     challenge, dev_code, email_sent = _create_email_verification(db, user)
     return RegisterResponse(
         user=user,
@@ -103,7 +120,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             email_sent=email_sent,
         )
 
-    two_factor_required = bool(user.role == UserRole.business_account and user.is_2fa_enabled)
+    two_factor_required = bool(user.role in {UserRole.business_account, UserRole.broker_account} and user.is_2fa_enabled)
     if two_factor_required:
         code = generate_otp_code()
         challenge = TwoFactorChallenge(

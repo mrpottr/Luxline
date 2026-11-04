@@ -516,7 +516,10 @@ class BrokerListingCreate(BaseModel):
     location_address: str | None = Field(default=None, max_length=255)
     assigned_agent_id: int | None = None
     branch_id: int | None = None
+    owner_name: str | None = Field(default=None, max_length=200)
+    owner_mandate_reference: str | None = Field(default=None, max_length=200)
     owner_consent: bool = Field(default=False)
+    commission_terms: str | None = Field(default=None, max_length=2000)
     urgent_flag: bool = Field(default=False)
     photos: list[str] = Field(default_factory=list, max_length=50)
     media: list[BrokerListingMediaInput] = Field(default_factory=list, max_length=50)
@@ -546,7 +549,10 @@ class BrokerListingUpdate(BaseModel):
     location_address: str | None = None
     assigned_agent_id: int | None = None
     branch_id: int | None = None
+    owner_name: str | None = Field(default=None, max_length=200)
+    owner_mandate_reference: str | None = Field(default=None, max_length=200)
     owner_consent: bool | None = None
+    commission_terms: str | None = Field(default=None, max_length=2000)
     urgent_flag: bool | None = None
     photos: list[str] | None = Field(default=None, max_length=50)
     media: list[BrokerListingMediaInput] | None = Field(default=None, max_length=50)
@@ -582,7 +588,10 @@ class BrokerListingOut(BaseModel):
     moderation_status: str
     assigned_agent_id: int | None = None
     branch_id: int | None = None
+    owner_name: str | None = None
+    owner_mandate_reference: str | None = None
     owner_consent: bool
+    commission_terms: str | None = None
     quality_score: int
     quality_rating: str
     quality_suggestions: list[str] = Field(default_factory=list)

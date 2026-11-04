@@ -823,6 +823,7 @@ export default function AdminDashboard() {
                 <option value="standard_user">Buyer (Standard User)</option>
                 <option value="private_seller">Private Seller</option>
                 <option value="business_account">Business Account</option>
+                {BROKER_PANEL_ENABLED && <option value="broker_account">Property Broker</option>}
                 <option value="super_admin">Super Administrator</option>
               </select>
             </div>
@@ -889,6 +890,7 @@ export default function AdminDashboard() {
                                 <option value="standard_user">Set: Standard</option>
                                 <option value="private_seller">Set: Seller</option>
                                 <option value="business_account">Set: Business</option>
+                                {BROKER_PANEL_ENABLED && <option value="broker_account">Set: Property Broker</option>}
                               </select>
 
                               {!u.is_verified_business && (

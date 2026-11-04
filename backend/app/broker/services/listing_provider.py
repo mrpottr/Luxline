@@ -82,7 +82,10 @@ class MongoListingProvider:
             "moderation_status": listing.moderation_status.value if listing else "pending",
             "assigned_agent_id": extension.assigned_agent_id,
             "branch_id": extension.branch_id,
+            "owner_name": extension.owner_name,
+            "owner_mandate_reference": extension.owner_mandate_reference,
             "owner_consent": extension.owner_consent,
+            "commission_terms": extension.commission_terms,
             "quality_score": extension.quality_score,
             "quality_rating": extension.quality_rating,
             "quality_suggestions": extension.quality_suggestions,
@@ -108,6 +111,9 @@ class MongoListingProvider:
         return [category.value for category in ListingCategory]
 
     def create_listing(self, *, payload: dict[str, Any], user_id: int, idempotency_key: str) -> dict[str, Any]:
+        payload = dict(payload)
+        if not payload.get("commission_terms"):
+            payload.pop("commission_terms", None)
         existing = self.repository.find_by_idempotency_key(idempotency_key)
         if existing:
             payload_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
@@ -153,12 +159,15 @@ class MongoListingProvider:
                 has_location=bool(payload.get("location_city") and payload.get("location_country")),
                 has_specs=bool(payload.get("attributes")),
                 owner_consent=payload.get("owner_consent", False),
+                commission_terms=payload.get("commission_terms"),
             )
             payload_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
             extension = self.repository.create(
                 listing_id=listing.id,
                 assigned_agent_id=assigned_agent_id,
                 branch_id=payload.get("branch_id"),
+                owner_name=payload.get("owner_name"),
+                owner_mandate_reference=payload.get("owner_mandate_reference"),
                 owner_consent=payload.get("owner_consent", False),
                 quality_score=score,
                 quality_rating=rating,
@@ -194,7 +203,10 @@ class MongoListingProvider:
                 "location_city": listing.location_city,
                 "assigned_agent_id": extension.assigned_agent_id,
                 "branch_id": extension.branch_id,
+                "owner_name": extension.owner_name,
+                "owner_mandate_reference": extension.owner_mandate_reference,
                 "owner_consent": extension.owner_consent,
+                "commission_terms": extension.commission_terms,
                 "urgent_flag": extension.urgent_flag,
                 "quality_score": extension.quality_score,
                 "quality_rating": extension.quality_rating,
@@ -207,7 +219,7 @@ class MongoListingProvider:
         if "title" in changes and changes["title"]:
             listing.slug = f"{slugify(changes['title'])}-{uuid.uuid4().hex[:8]}"
         listing.save()
-        for field in ("assigned_agent_id", "branch_id", "owner_consent", "urgent_flag"):
+        for field in ("assigned_agent_id", "branch_id", "owner_name", "owner_mandate_reference", "owner_consent", "commission_terms", "urgent_flag"):
             if field in changes and changes[field] is not None:
                 setattr(extension, field, changes[field])
         if changes.get("media") is not None:
@@ -334,6 +346,9 @@ class MongoListingProvider:
                 for region, value in licences.items()
             ),
             "owner_consent": extension.owner_consent,
+            "owner_name": extension.owner_name,
+            "owner_mandate_reference": extension.owner_mandate_reference,
+            "commission_terms": extension.commission_terms,
             "category": listing.category.value,
             "price": listing.price,
             "currency": listing.currency,

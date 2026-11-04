@@ -74,7 +74,7 @@ All modifications to existing files are strictly confined to safe seams and logg
 ---
 
 ### Milestone 2: Onboarding & Branded Public Profile
-* **Goal:** Business application and review lifecycle (draft, submitted, approved, rejected, suspended), admin review integration, and public branded profile view.
+* **Goal:** Business application and review lifecycle (draft, submitted, approved, rejected, suspended), admin review integration, and public branded profile view. The signup flow includes a separate `broker_account` persona when the broker feature flag is on. A property broker represents owners and does not claim property ownership; their account owns an existing AgencyProfile that serves as the brokerage organization.
 * **New Files to Create:**
   * `backend/app/broker/domain/onboarding.py` (Verification state machine and rules)
   * `backend/app/broker/api/onboarding.py` (Apply, submit documents, check status)
@@ -86,7 +86,12 @@ All modifications to existing files are strictly confined to safe seams and logg
 * **Shared Files Touched:** None.
 * **Success Criteria:**
   * Unapproved business accounts cannot access operational tools.
+  * Property brokers can register only while the broker flag is enabled, complete 2FA, and submit broker profile/licence details for review.
+  * Broker listings require the owner's name, a mandate reference, explicit consent, and recorded commission terms before publishing; commission terms are records only and no money is calculated or transferred.
   * Public profile renders logo, banner, bio, licenses, and verified badges.
+* **Additional Files Touched:** `backend/app/models.py`, `backend/app/routers/auth.py`, `backend/app/routers/admin.py`, `backend/app/broker/application/access_use_cases.py`, `backend/app/broker/models/listing_extension.py`, `backend/app/broker/schemas.py`, `backend/app/broker/services/listing_provider.py`, `backend/app/broker/domain/listing_rules.py`, `backend/app/broker/application/listing_use_cases.py`, `backend/app/broker/api/listings.py`, `frontend/components/HomePage.jsx`, `frontend/components/AdminDashboard.jsx`, `frontend/components/broker/featureFlag.mjs`, `frontend/components/broker/BrokerApp.jsx`, `frontend/components/broker/screens/ListingEditorScreen.jsx`, `frontend/components/broker/i18n/catalog.mjs`, `frontend/Dockerfile`, `docker-compose.yml`, `tests/test_broker_m0_scaffold.py`, `frontend/tests/brokerFeatureFlag.test.mjs`, `tests/test_broker_listings.py`, and `docs/broker/{API,DECISIONS,TOUCHPOINTS}.md`.
+
+**Property broker account extension verification:** Frontend tests: 3 passed; lint: 0 errors and 21 existing warnings; Vite production build passed; Python compileall passed; `docker compose config -q` passed with Docker config access warnings. Backend pytest could not run because pytest is absent from the available local Python environment. New listing fields are optional nullable fields on the additive `broker_listings` collection; no existing listing or user records were migrated. No database writes were made.
 
 ---
 
