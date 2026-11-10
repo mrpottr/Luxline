@@ -22,6 +22,36 @@ const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || impor
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 const BROKER_API_BASE = API_BASE.replace('/api/v1', '/api/broker/v1');
 
+class BrokerScreenBoundary extends React.Component {
+  state = { hasError: false, message: '' };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, message: error?.message || '' };
+  }
+
+  componentDidCatch(error) {
+    console.error(`Broker screen failed to render (${this.props.screen})`, error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="broker-card" role="alert" aria-live="assertive">
+          <h1 className="broker-card-title">This broker page could not be displayed</h1>
+          <p className="broker-card-subtitle">
+            The rest of the broker panel is still available. Return to the dashboard and try this page again.
+          </p>
+          {import.meta.env.DEV && this.state.message && <pre>{this.state.message}</pre>}
+          <button className="broker-btn-secondary" type="button" onClick={this.props.onReturn}>
+            Return to dashboard
+          </button>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function getRoleFromJwt(jwtToken) {
   try {
     if (!jwtToken) return null;
@@ -228,6 +258,7 @@ function BrokerApp() {
         </header>
 
         <div className="broker-content">
+          <BrokerScreenBoundary key={activeTab} screen={activeTab} onReturn={() => setActiveTab('dashboard')}>
           {activeTab === 'onboarding' && (
             <OnboardingScreen token={token} apiBase={BROKER_API_BASE} />
           )}
@@ -273,6 +304,7 @@ function BrokerApp() {
           {activeTab === 'billing' && role === 'broker_owner' && <BillingPlansScreen token={token} apiBase={BROKER_API_BASE} />}
           {activeTab === 'trust' && (role === 'broker_owner' || role === 'broker_manager') && <ReviewsScreen token={token} apiBase={BROKER_API_BASE} />}
           {activeTab === 'audit' && role === 'broker_owner' && <AuditLogScreen token={token} apiBase={BROKER_API_BASE} />}
+          </BrokerScreenBoundary>
         </div>
       </main>
     </div>

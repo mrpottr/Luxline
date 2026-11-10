@@ -98,3 +98,4 @@ The broker route registry is the only backend route seam changed. Analytics even
 | `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | M2 extension | Added the Property Broker and commission agreement strings to the broker namespace. |
 | `docker-compose.yml` | Runtime configuration | M2 extension | Passes `BROKER_PANEL_ENABLED` to the backend and the Vite flag as a frontend build argument; both default to false. |
 | `frontend/Dockerfile` | Frontend build configuration | M2 extension | Declares the optional Vite broker flag build argument with a false default and embeds it at build time. |
+| `frontend/components/broker/BrokerApp.jsx` | Broker screen rendering | UI reliability fix | Adds a per-tab render boundary so a broker screen error no longer blanks the entire panel and can be exited back to the dashboard. |

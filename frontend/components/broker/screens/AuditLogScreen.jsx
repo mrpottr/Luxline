@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
+import { responseList } from './responseUtils.mjs';
 
 function AuditLogScreen({ token, apiBase }) {
   const [rows, setRows] = useState([]);
@@ -13,7 +14,7 @@ function AuditLogScreen({ token, apiBase }) {
       const response = await fetch(`${apiBase}/audit?limit=50&offset=0`, { headers: { Authorization: `Bearer ${token}` } });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || 'Unable to load the audit log.');
-      setRows(body);
+      setRows(responseList(body, 'entries'));
     } catch (loadError) {
       setError(loadError.message || 'Audit log is offline. Retry when connected.');
     } finally {

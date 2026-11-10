@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
+import { responseList, responseRecord } from './responseUtils.mjs';
 
 function PromotionsScreen({ token, apiBase }) {
   const [listings, setListings] = useState([]);
@@ -28,9 +29,9 @@ function PromotionsScreen({ token, apiBase }) {
       if (!listingResponse.ok || !promotionResponse.ok || !balanceResponse.ok) {
         throw new Error(listingBody.detail || promotionBody.detail || balanceBody.detail || 'Unable to load promotions.');
       }
-      setListings(Array.isArray(listingBody) ? listingBody : listingBody.items || []);
-      setPromotions(promotionBody);
-      setBalance(balanceBody.balance);
+      setListings(responseList(listingBody, 'listings'));
+      setPromotions(responseList(promotionBody, 'promotions'));
+      setBalance(responseRecord(balanceBody, 'wallet').balance ?? 0);
     } catch (loadError) {
       setError(loadError.message || 'Promotions are offline. Retry when connected.');
     } finally {

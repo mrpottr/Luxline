@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
+import { responseList, responseRecord } from './responseUtils.mjs';
 
 function BillingPlansScreen({ token, apiBase }) {
   const [plans, setPlans] = useState([]);
@@ -26,9 +27,10 @@ function BillingPlansScreen({ token, apiBase }) {
       if (!planResponse.ok || !subscriptionResponse.ok || !walletResponse.ok) {
         throw new Error(planBody.detail || subscriptionBody.detail || walletBody.detail || 'Unable to load billing information.');
       }
-      setPlans(planBody);
-      setSubscription(subscriptionBody);
-      setWallet(walletBody);
+      setPlans(responseList(planBody, 'plans'));
+      setSubscription(responseRecord(subscriptionBody, 'subscription'));
+      const wallet = responseRecord(walletBody, 'wallet');
+      setWallet({ ...wallet, ledger: responseList(wallet.ledger, 'entries') });
     } catch (loadError) {
       setError(loadError.message || 'Billing is offline. Retry when connected.');
     } finally {

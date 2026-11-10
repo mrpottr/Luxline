@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { withBrokerTranslations } from '../i18n/withBrokerTranslations';
+import { responseList } from './responseUtils.mjs';
 
 function ReviewsScreen({ token, apiBase }) {
   const [reviews, setReviews] = useState([]);
@@ -25,8 +26,8 @@ function ReviewsScreen({ token, apiBase }) {
       if (!reviewResponse.ok || !badgeResponse.ok) {
         throw new Error(reviewBody.detail || badgeBody.detail || 'Unable to load trust information.');
       }
-      setReviews(reviewBody);
-      setBadges(badgeBody);
+      setReviews(responseList(reviewBody, 'reviews'));
+      setBadges(responseList(badgeBody, 'badges'));
     } catch (loadError) {
       setError(loadError.message || 'Trust services are offline. Retry when connected.');
     } finally {
