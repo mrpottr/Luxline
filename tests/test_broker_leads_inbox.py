@@ -79,6 +79,11 @@ class TestLeadUseCases(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.agent.set_stage(31, "deleted")
 
+    def test_viewing_activity_is_allowed(self):
+        self.agent.add_activity(31, activity_type="viewing", body="Penthouse lobby", idempotency_key="viewing-key-001")
+        self.provider.add_activity.assert_called_once()
+        self.assertEqual(self.provider.add_activity.call_args.kwargs["activity_type"], "viewing")
+
     def test_agent_cannot_message_lead_without_account_consent_link(self):
         self.provider.get_lead.return_value.buyer_id = None
         self.assertIsNone(self.agent.send_agent_message(31, "Hello", "message-key-0001"))

@@ -91,7 +91,7 @@ class LeadUseCases:
 
     def add_activity(self, lead_id: int, *, activity_type: str, body: str, due_at=None, idempotency_key: str):
         self._require(BrokerPermission.LEAD_VIEW_OWN if self._visible_assignee() else BrokerPermission.LEAD_VIEW_ALL)
-        if activity_type not in {"note", "task", "reminder"}:
+        if activity_type not in {"note", "task", "reminder", "viewing"}:
             raise ValueError("Unsupported lead activity type")
         lead = self.provider.get_lead(lead_id)
         if not lead or (self._visible_assignee() and lead.assigned_member_id != self.actor_user_id):

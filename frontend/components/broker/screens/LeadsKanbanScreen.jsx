@@ -7,6 +7,14 @@ function createIdempotencyKey() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function leadAge(lead) {
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(lead.created_at).getTime()) / 60000));
+  if (lead.stage === 'new' && elapsedMinutes >= 60) return { label: `Overdue · ${Math.floor(elapsedMinutes / 60)}h`, urgent: true };
+  if (lead.stage === 'new' && elapsedMinutes >= 15) return { label: `Waiting ${elapsedMinutes}m`, urgent: false };
+  if (elapsedMinutes >= 1440) return { label: `${Math.floor(elapsedMinutes / 1440)}d old`, urgent: false };
+  return { label: 'Fresh lead', urgent: false };
+}
+
 function LeadsKanbanScreen({ token, apiBase }) {
   const [leads, setLeads] = useState([]);
   const [members, setMembers] = useState([]);
@@ -72,6 +80,32 @@ function LeadsKanbanScreen({ token, apiBase }) {
     }
   }
 
+  async function scheduleViewing(leadId) {
+    const when = window.prompt('Viewing date and time (for example: 2026-11-14 14:30)');
+    if (!when?.trim()) return;
+    const dueAt = new Date(when);
+    if (Number.isNaN(dueAt.getTime())) {
+      setError('Enter a valid viewing date and time.');
+      return;
+    }
+    const details = window.prompt('Viewing details (location, meeting point, or note)') || 'Viewing appointment requested';
+    try {
+      const response = await fetch(`${apiBase}/leads/${leadId}/activities`, {
+        method: 'POST', headers: { ...headers, 'Idempotency-Key': createIdempotencyKey() },
+        body: JSON.stringify({ activity_type: 'viewing', body: details.trim(), due_at: dueAt.toISOString() }),
+      });
+      if (!response.ok) throw new Error('Unable to schedule the viewing.');
+      setStatus(`Viewing scheduled for ${dueAt.toLocaleString()}.`);
+    } catch (viewingError) {
+      setError(viewingError.message);
+    }
+  }
+
+  const workload = members.filter((member) => member.is_active).map((member) => ({
+    member,
+    leads: leads.filter((lead) => lead.assigned_member_id === member.user_id),
+  })).filter(({ leads: assigned }) => assigned.length);
+
   if (loading) return <div className="broker-card" role="status">Loading leads…</div>;
   if (error && !leads.length) return <div className="broker-card" role="alert"><p>{error}</p><button type="button" className="broker-btn-gold" onClick={loadLeads}>Retry</button></div>;
 
@@ -86,6 +120,17 @@ function LeadsKanbanScreen({ token, apiBase }) {
         </div>
         {error && <p role="alert">{error}</p>}
         {status && <p role="status">{status}</p>}
+        {workload.length > 0 && (
+          <div className="broker-analytics-grid" aria-label="Current agent workload">
+            {workload.map(({ member, leads: assigned }) => {
+              const overdue = assigned.filter((lead) => leadAge(lead).urgent).length;
+              return <article className="broker-analytics-card" key={member.user_id}>
+                <span>{member.display_name || member.email || `Agent ${member.user_id}`}</span>
+                <strong>{assigned.length} leads{overdue ? ` · ${overdue} overdue` : ''}</strong>
+              </article>;
+            })}
+          </div>
+        )}
         <div className="broker-inbox-actions" aria-label="Lead pagination">
           <button type="button" disabled={offset === 0 || loading} onClick={() => setOffset((value) => Math.max(0, value - pageSize))}>Previous</button>
           <span>Showing {leads.length ? offset + 1 : 0}–{offset + leads.length}</span>
@@ -95,6 +140,10 @@ function LeadsKanbanScreen({ token, apiBase }) {
           <div className="broker-lead-grid">
             {leads.map((lead) => (
               <article className="broker-card broker-lead-card" key={lead.id}>
+                {(() => {
+                  const age = leadAge(lead);
+                  return <span className="broker-badge-pill" style={age.urgent ? { color: '#ff8b8b', borderColor: '#b54b4b' } : undefined}>{age.label}</span>;
+                })()}
                 <div className="broker-lead-heading">
                   <h2>{lead.buyer_name}</h2>
                   <span>{lead.score} / 100</span>
@@ -120,6 +169,7 @@ function LeadsKanbanScreen({ token, apiBase }) {
                     </select>
                   </label>
                   <button type="button" className="broker-btn-gold" onClick={() => addNote(lead.id)}>Add note</button>
+                  <button type="button" onClick={() => scheduleViewing(lead.id)}>Schedule viewing</button>
                   <button type="button" onClick={() => updateLead(lead.id, 'spam', { spam_flag: !lead.spam_flag }, lead.spam_flag ? 'Lead marked as legitimate.' : 'Lead marked as spam')}>
                     {lead.spam_flag ? 'Mark legitimate' : 'Mark spam'}
                   </button>

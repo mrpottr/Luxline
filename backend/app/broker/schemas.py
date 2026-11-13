@@ -243,7 +243,7 @@ class BrokerLeadAssign(BaseModel):
 
 
 class BrokerLeadActivityCreate(BaseModel):
-    activity_type: str = Field(pattern="^(note|task|reminder)$")
+    activity_type: str = Field(pattern="^(note|task|reminder|viewing)$")
     body: str = Field(min_length=1, max_length=5000)
     due_at: datetime | None = None
 
