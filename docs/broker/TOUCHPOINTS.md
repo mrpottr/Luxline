@@ -95,7 +95,7 @@ The broker route registry is the only backend route seam changed. Analytics even
 | `backend/app/routers/admin.py` | Existing role administration route | M2 extension | Preserves the business 2FA requirement when an administrator assigns the new broker account role. |
 | `frontend/components/AdminDashboard.jsx` | Existing role administration UI | M2 extension | Adds the flagged Property Broker role to account creation and role management choices. |
 | `frontend/components/broker/featureFlag.mjs` | Broker navigation seam | M2 extension | Allows the enabled broker panel for `broker_account` as well as business account users. |
-| `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | M2 extension | Added the Property Broker and commission agreement strings to the broker namespace. |
+| `frontend/components/broker/i18n/catalog.mjs` | i18n catalog | M2 extension and UI reliability fix | Added Property Broker, commission agreement, and approval-gate messages to the broker namespace. |
 | `docker-compose.yml` | Runtime configuration | M2 extension | Passes `BROKER_PANEL_ENABLED` to the backend and the Vite flag as a frontend build argument; both default to false. |
 | `frontend/Dockerfile` | Frontend build configuration | M2 extension | Declares the optional Vite broker flag build argument with a false default and embeds it at build time. |
-| `frontend/components/broker/BrokerApp.jsx` | Broker screen rendering | UI reliability fix | Adds a per-tab render boundary so a broker screen error no longer blanks the entire panel and can be exited back to the dashboard. |
+| `frontend/components/broker/BrokerApp.jsx` | Broker navigation and screen rendering | UI reliability fix | Shows an application-status gate on capabilities that return 403 until admin approval, preserves verification as the next action, and catches render errors per tab so one page cannot blank the panel. |

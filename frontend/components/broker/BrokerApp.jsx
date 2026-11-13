@@ -21,6 +21,29 @@ import AuditLogScreen from './screens/AuditLogScreen';
 const IS_ENABLED = import.meta.env.VITE_BROKER_PANEL_ENABLED === 'true' || import.meta.env.VITE_BROKER_PANEL_ENABLED === true;
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 const BROKER_API_BASE = API_BASE.replace('/api/v1', '/api/broker/v1');
+const APPROVAL_GATED_TABS = new Set(['dashboard', 'listings', 'leads', 'inbox', 'promotions', 'analytics', 'trust', 'audit', 'billing']);
+
+function BrokerApprovalNotice({ status, loading, onOpenApplication, onRetry }) {
+  let message = 'Broker verification must be completed before these capabilities can be used.';
+  if (loading) message = 'Checking broker verification status…';
+  else if (status === 'submitted') message = 'Your application is submitted and waiting for platform admin review.';
+  else if (status === 'rejected') message = 'Your application needs changes before the broker capabilities can be enabled.';
+  else if (status === 'suspended') message = 'Broker capabilities are paused. Contact platform support for a review.';
+  else if (status === 'unavailable') message = 'We could not check your verification status. Retry after reconnecting.';
+  else if (status === 'draft') message = 'Complete and submit your broker application. Platform admin approval is required to unlock these capabilities.';
+
+  return (
+    <section className="broker-card" role="status" aria-live="polite">
+      <span className="broker-badge-pill">Verification {status && status !== 'unavailable' ? `· ${status}` : ''}</span>
+      <h1 className="broker-card-title">Broker capabilities are not available yet</h1>
+      <p className="broker-card-subtitle">{message}</p>
+      {!loading && status !== 'unavailable' && status !== 'approved' && (
+        <button className="broker-btn-gold" type="button" onClick={onOpenApplication}>Open broker verification</button>
+      )}
+      {status === 'unavailable' && <button className="broker-btn-secondary" type="button" onClick={onRetry}>Retry status check</button>}
+    </section>
+  );
+}
 
 class BrokerScreenBoundary extends React.Component {
   state = { hasError: false, message: '' };
@@ -72,6 +95,8 @@ function BrokerApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [brokerHealth, setBrokerHealth] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [brokerStatus, setBrokerStatus] = useState(null);
+  const [brokerStatusLoading, setBrokerStatusLoading] = useState(true);
   const [listingEditor, setListingEditor] = useState(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
 
@@ -81,6 +106,26 @@ function BrokerApp() {
       .then((response) => (response.ok ? response.json() : null))
       .then((context) => { if (context?.role) setRole(context.role); })
       .catch(() => {});
+  }, [token]);
+
+  async function loadBrokerStatus() {
+    setBrokerStatusLoading(true);
+    try {
+      const response = await fetch(`${BROKER_API_BASE}/onboarding/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Unable to check broker verification status');
+      const profile = await response.json();
+      setBrokerStatus(profile?.status || 'unavailable');
+    } catch {
+      setBrokerStatus('unavailable');
+    } finally {
+      setBrokerStatusLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (token) loadBrokerStatus();
   }, [token]);
 
   // If the feature flag is disabled, show disabled notice
@@ -259,8 +304,21 @@ function BrokerApp() {
 
         <div className="broker-content">
           <BrokerScreenBoundary key={activeTab} screen={activeTab} onReturn={() => setActiveTab('dashboard')}>
+          {APPROVAL_GATED_TABS.has(activeTab) && brokerStatus !== 'approved' ? (
+            <BrokerApprovalNotice
+              status={brokerStatus}
+              loading={brokerStatusLoading}
+              onOpenApplication={() => setActiveTab('onboarding')}
+              onRetry={loadBrokerStatus}
+            />
+          ) : (
+            <>
           {activeTab === 'onboarding' && (
-            <OnboardingScreen token={token} apiBase={BROKER_API_BASE} />
+            <OnboardingScreen
+              token={token}
+              apiBase={BROKER_API_BASE}
+              onProfileUpdated={(profile) => setBrokerStatus(profile?.status || 'unavailable')}
+            />
           )}
           {activeTab === 'profile' && (
             <PublicProfileEditor token={token} apiBase={BROKER_API_BASE} />
@@ -304,6 +362,8 @@ function BrokerApp() {
           {activeTab === 'billing' && role === 'broker_owner' && <BillingPlansScreen token={token} apiBase={BROKER_API_BASE} />}
           {activeTab === 'trust' && (role === 'broker_owner' || role === 'broker_manager') && <ReviewsScreen token={token} apiBase={BROKER_API_BASE} />}
           {activeTab === 'audit' && role === 'broker_owner' && <AuditLogScreen token={token} apiBase={BROKER_API_BASE} />}
+            </>
+          )}
           </BrokerScreenBoundary>
         </div>
       </main>
