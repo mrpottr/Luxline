@@ -25,15 +25,18 @@ function BranchesScreen({ token, apiBase }) {
   async function fetchBranches() {
     try {
       setLoading(true);
+      setErrorMessage('');
       const res = await fetch(`${apiBase}/branches`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setBranches(data);
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to load branch offices');
       }
-    } catch {
-      setErrorMessage('Failed to load branch offices');
+      setBranches(await res.json());
+    } catch (error) {
+      setBranches([]);
+      setErrorMessage(error.message || 'Failed to load branch offices');
     } finally {
       setLoading(false);
     }

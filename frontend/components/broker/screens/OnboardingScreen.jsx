@@ -31,24 +31,26 @@ function OnboardingScreen({ token, apiBase, onProfileUpdated }) {
       const res = await fetch(`${apiBase}/onboarding/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setProfile(data);
-        setForm({
-          company_name: data.company_name || '',
-          legal_name: data.legal_name || '',
-          address: data.address || '',
-          city: data.city || '',
-          country: data.country || '',
-          contact_email: data.contact_email || '',
-          contact_phone: data.contact_phone || '',
-          whatsapp_number: data.whatsapp_number || '',
-          licence_region: Object.keys(data.licences || {})[0] || 'LK',
-          licence_number: Object.values(data.licences || {})[0] || '',
-        });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to load profile');
       }
+      const data = await res.json();
+      setProfile(data);
+      setForm({
+        company_name: data.company_name || '',
+        legal_name: data.legal_name || '',
+        address: data.address || '',
+        city: data.city || '',
+        country: data.country || '',
+        contact_email: data.contact_email || '',
+        contact_phone: data.contact_phone || '',
+        whatsapp_number: data.whatsapp_number || '',
+        licence_region: Object.keys(data.licences || {})[0] || 'LK',
+        licence_number: Object.values(data.licences || {})[0] || '',
+      });
     } catch (err) {
-      setErrorMessage('Failed to load profile');
+      setErrorMessage(err.message || 'Failed to load profile');
     } finally {
       setLoading(false);
     }

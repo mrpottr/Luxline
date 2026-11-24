@@ -52,7 +52,7 @@ function LeadsKanbanScreen({ token, apiBase }) {
     setStatus('');
     try {
       const response = await fetch(`${apiBase}/leads/${leadId}/${path}`, {
-        method: 'PATCH', headers, body: JSON.stringify(payload),
+        method: path === 'assign' ? 'POST' : 'PATCH', headers, body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));

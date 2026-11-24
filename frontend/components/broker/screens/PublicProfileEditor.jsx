@@ -27,20 +27,22 @@ function PublicProfileEditor({ token, apiBase }) {
       const res = await fetch(`${apiBase}/onboarding/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setProfile(data);
-        setForm({
-          logo_url: data.logo_url || '',
-          banner_url: data.banner_url || '',
-          about: data.about || '',
-          website: data.website || '',
-          languages: (data.languages || []).join(', ') || 'en',
-          service_areas: (data.service_areas || []).join(', '),
-        });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.detail || 'Failed to load profile');
       }
-    } catch {
-      setErrorMessage('Failed to load profile');
+      const data = await res.json();
+      setProfile(data);
+      setForm({
+        logo_url: data.logo_url || '',
+        banner_url: data.banner_url || '',
+        about: data.about || '',
+        website: data.website || '',
+        languages: (data.languages || []).join(', ') || 'en',
+        service_areas: (data.service_areas || []).join(', '),
+      });
+    } catch (error) {
+      setErrorMessage(error.message || 'Failed to load profile');
     } finally {
       setLoading(false);
     }

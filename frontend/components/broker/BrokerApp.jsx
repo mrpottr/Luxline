@@ -23,13 +23,13 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api
 const BROKER_API_BASE = API_BASE.replace('/api/v1', '/api/broker/v1');
 const APPROVAL_GATED_TABS = new Set(['dashboard', 'listings', 'leads', 'inbox', 'promotions', 'analytics', 'trust', 'audit', 'billing']);
 
-function BrokerApprovalNotice({ status, loading, onOpenApplication, onRetry }) {
+function BrokerApprovalNotice({ status, loading, errorMessage, onOpenApplication, onRetry }) {
   let message = 'Broker verification must be completed before these capabilities can be used.';
   if (loading) message = 'Checking broker verification status…';
   else if (status === 'submitted') message = 'Your application is submitted and waiting for platform admin review.';
   else if (status === 'rejected') message = 'Your application needs changes before the broker capabilities can be enabled.';
   else if (status === 'suspended') message = 'Broker capabilities are paused. Contact platform support for a review.';
-  else if (status === 'unavailable') message = 'We could not check your verification status. Retry after reconnecting.';
+  else if (status === 'unavailable') message = errorMessage || 'We could not check your verification status. Retry after reconnecting.';
   else if (status === 'draft') message = 'Complete and submit your broker application. Platform admin approval is required to unlock these capabilities.';
 
   return (
@@ -97,6 +97,7 @@ function BrokerApp() {
   const [loading, setLoading] = useState(true);
   const [brokerStatus, setBrokerStatus] = useState(null);
   const [brokerStatusLoading, setBrokerStatusLoading] = useState(true);
+  const [brokerStatusError, setBrokerStatusError] = useState('');
   const [listingEditor, setListingEditor] = useState(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
 
@@ -110,15 +111,21 @@ function BrokerApp() {
 
   async function loadBrokerStatus() {
     setBrokerStatusLoading(true);
+    setBrokerStatusError('');
     try {
       const response = await fetch(`${BROKER_API_BASE}/onboarding/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!response.ok) throw new Error('Unable to check broker verification status');
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        if (response.status === 401) throw new Error('Your sign-in session has expired. Please sign in again.');
+        throw new Error(body.detail || 'Unable to check broker verification status');
+      }
       const profile = await response.json();
       setBrokerStatus(profile?.status || 'unavailable');
-    } catch {
+    } catch (error) {
       setBrokerStatus('unavailable');
+      setBrokerStatusError(error.message || 'We could not check your verification status. Retry after reconnecting.');
     } finally {
       setBrokerStatusLoading(false);
     }
@@ -308,12 +315,20 @@ function BrokerApp() {
             <BrokerApprovalNotice
               status={brokerStatus}
               loading={brokerStatusLoading}
+              errorMessage={brokerStatusError}
               onOpenApplication={() => setActiveTab('onboarding')}
               onRetry={loadBrokerStatus}
             />
           ) : (
             <>
           {activeTab === 'onboarding' && (
+            <OnboardingScreen
+              token={token}
+              apiBase={BROKER_API_BASE}
+              onProfileUpdated={(profile) => setBrokerStatus(profile?.status || 'unavailable')}
+            />
+          )}
+          {activeTab === 'settings' && (
             <OnboardingScreen
               token={token}
               apiBase={BROKER_API_BASE}
